@@ -1,0 +1,78 @@
+name: Deploy carisma Backend app
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: backend_runner
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create .env
+        env:
+          PORT: ${{ secrets.PORT }}
+          CP_PUBLIC_ID: ${{ secrets.CP_PUBLIC_ID }}
+          CP_PRIVATE_KEY: ${{ secrets.CP_PRIVATE_KEY }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          CLOUDFLARE_S3_TOKEN: ${{ secrets.CLOUDFLARE_S3_TOKEN }}
+          CLOUDFLARE_S3_KEY_ID: ${{ secrets.CLOUDFLARE_S3_KEY_ID }}
+          CLOUDFLARE_S3_KEY_SECRET: ${{ secrets.CLOUDFLARE_S3_KEY_SECRET }}
+          CLOUDFLARE_S3_URL: ${{ secrets.CLOUDFLARE_S3_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_DEV_ID: ${{ secrets.EBAY_DEV_ID }}
+          EBAY_STORE_NAME: ${{ secrets.EBAY_STORE_NAME }}
+          EBAY_SELLER_ID: ${{ secrets.EBAY_SELLER_ID }}
+          EBAY_CATALOG_LIMIT: ${{ secrets.EBAY_CATALOG_LIMIT }}
+          EBAY_MARKETPLACE_ID: ${{ secrets.EBAY_MARKETPLACE_ID }}
+          EBAY_QUERY: ${{ secrets.EBAY_QUERY }}
+          EBAY_QUERY_SEEDS: ${{ secrets.EBAY_QUERY_SEEDS }}
+          EBAY_COMPATIBILITY_ENABLED: ${{ secrets.EBAY_COMPATIBILITY_ENABLED }}
+        run: |
+          cat <<EOF > .env.production
+          PORT=$PORT
+          CP_PUBLIC_ID=$CP_PUBLIC_ID
+          CP_PRIVATE_KEY=$CP_PRIVATE_KEY
+          DB_NAME=$DB_NAME
+          DB_USER=$DB_USER
+          DB_PASSWORD=$DB_PASSWORD
+          DB_HOST=$DB_HOST
+          DB_PORT=$DB_PORT
+          CLOUDFLARE_S3_TOKEN=$CLOUDFLARE_S3_TOKEN
+          CLOUDFLARE_S3_KEY_ID=$CLOUDFLARE_S3_KEY_ID
+          CLOUDFLARE_S3_KEY_SECRET=$CLOUDFLARE_S3_KEY_SECRET
+          CLOUDFLARE_S3_URL=$CLOUDFLARE_S3_URL
+          SECRET_KEY=$SECRET_KEY
+          EBAY_CLIENT_ID=$EBAY_CLIENT_ID
+          EBAY_CLIENT_SECRET=$EBAY_CLIENT_SECRET
+          EBAY_DEV_ID=$EBAY_DEV_ID
+          EBAY_STORE_NAME=$EBAY_STORE_NAME
+          EBAY_SELLER_ID=$EBAY_SELLER_ID
+          EBAY_CATALOG_LIMIT=$EBAY_CATALOG_LIMIT
+          EBAY_MARKETPLACE_ID=$EBAY_MARKETPLACE_ID
+          EBAY_QUERY=$EBAY_QUERY
+          EBAY_QUERY_SEEDS=$EBAY_QUERY_SEEDS
+          EBAY_COMPATIBILITY_ENABLED=$EBAY_COMPATIBILITY_ENABLED
+          
+          EOF
+        shell: bash
+
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Build next app
+        run: npm run build
+
+      - name: Deploy to server
+        run: bash ./deploy.sh
+        
