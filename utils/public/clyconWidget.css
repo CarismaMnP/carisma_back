@@ -1,0 +1,70 @@
+.clyconButton{
+    display: flex;
+    align-items: center;
+    padding: 20px 32px;
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    font-size: 20px;
+    font-weight: 400;
+    background: #007BFF;
+    border-radius: 32px;
+    color: #FFFFFF;
+    stroke: none;
+    border: 1px solid #FFFFFF;
+    outline: none;
+    transition: 300ms;
+    cursor: pointer;
+}
+
+.clyconButton:hover{
+    transform: scale(1.1);
+}
+
+.clyconCloseIframeButton{
+    position: absolute;
+    top: 12px;
+    right: 612px;
+    cursor: pointer;
+    display: flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    stroke: none;
+    outline: none;
+    border: none;
+    background: #FFFFFF;
+}
+
+.clyconWidgetBackground{
+    display: flex;
+    align-items: center;
+    justify-content: end;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    background: rgba(9, 18, 27, 0.22);
+    opacity: 1;
+    transition: 300ms;
+}
+
+.clyconWidgetBackgroundHidden{
+    opacity: 0;
+    display: none;
+    transition: 300ms;
+}
+
+.clyconWidgetIFrame{
+    opacity: 1;
+    transition: 300ms;
+}
+
+.clyconWidgetIFrameHidden{
+    opacity: 0;
+    transition: 300ms;
+}

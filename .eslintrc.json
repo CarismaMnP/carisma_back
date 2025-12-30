@@ -1,0 +1,103 @@
+{
+  "plugins": [
+    "simple-import-sort",
+    "import",
+    "prettier"
+  ],
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:prettier/recommended",
+    "prettier"
+  ],
+  "rules": {
+    "prettier/prettier": [
+      "error",
+      {
+        "arrowParens": "avoid",
+        "bracketSpacing": true,
+        "printWidth": 100,
+        "semi": true,
+        "singleQuote": true,
+        "jsxSingleQuote": true,
+        "endOfLine": "lf",
+        "tabWidth": 2,
+        "trailingComma": "all"
+      }
+    ],
+    "simple-import-sort/imports": [
+      "warn",
+      {
+        "groups": [
+          // External libraries.
+          [
+            "^@?\\w"
+          ],
+          // Side effect imports.
+          [
+            "^\\u0000"
+          ],
+          // Own libraries and hooks.
+          [
+            "^~/lib",
+            "^~/hooks"
+          ],
+          // Static data.
+          [
+            "^~/data"
+          ],
+          // Components.
+          [
+            "^~/components"
+          ],
+          // Other imports.
+          [
+            "^~/"
+          ],
+          // Relative paths up to 3 levels.
+          [
+            "^\\./?$",
+            "^\\.(?!/?$)",
+            "^\\.\\./?$",
+            "^\\.\\.(?!/?$)",
+            "^\\.\\./\\.\\./?$",
+            "^\\.\\./\\.\\.(?!/?$)",
+            "^\\.\\./\\.\\./\\.\\./?$",
+            "^\\.\\./\\.\\./\\.\\.(?!/?$)"
+          ],
+          // Types.
+          [
+            "^~/types"
+          ],
+          // CSS/SCSS files.
+          [
+            "^.+\\.s?css$"
+          ],
+          // Others.
+          [
+            "^"
+          ]
+        ]
+      }
+    ],
+    "simple-import-sort/exports": "error",
+    "import/first": "error",
+    "import/newline-after-import": "error",
+    "import/no-duplicates": "error",
+    "react/no-unstable-nested-components": [
+      "off"
+    ],
+    "@typescript-eslint/no-unused-vars": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "no-unused-vars": "off",
+    "no-undef": "off",
+    "no-useless-escape": "off",
+    "@next/next/no-img-element": "off",
+    "no-unsafe-optional-chaining": "off",
+    "react/display-name": "off"
+  },
+  "parserOptions": {
+    "sourceType": "module",
+    "ecmaVersion": "latest"
+  }
+}

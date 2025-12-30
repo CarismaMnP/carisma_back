@@ -1,0 +1,22 @@
+const Router = require('express')
+const router = new Router()
+const usersController = require('../../controllers/usersController')
+const authMiddleware = require('../../middleware/authMiddleware')
+
+router.post('/login', usersController.login)
+router.post('/login/sms', usersController.checkLoginSMSCode)
+router.get('/check', authMiddleware, usersController.check)
+router.put('/', authMiddleware, usersController.update)
+// router.get('/find_email', usersController.find_mail)
+// router.post('/recovery_password', usersController.recovery_password)
+// router.post('/check_code', usersController.check_code)
+// router.get('/auth', authMiddleware, usersController.check)
+// router.get('/list', usersController.list)
+// router.delete('/delete', usersController.delete)
+router.get('/session', usersController.session)
+router.get('/cart', usersController.fetchCart)
+router.get('/orders', authMiddleware, usersController.orders)
+router.post('/plusCart', usersController.plusCart)
+router.post('/minusCart', usersController.minusCart)
+
+module.exports = router
