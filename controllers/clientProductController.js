@@ -99,6 +99,23 @@ class ProductController {
     }
   }
 
+  async getFresh(req, res, next) {
+    try {
+      const limit = 12;
+
+      const products = await Product.findAll({
+        where: { isDeleted: false },
+        order: [['createdAt', 'DESC']],
+        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory"],
+        limit,
+      });
+
+      return res.json(products);
+    } catch (e) {
+      next(ApiError.badRequest(e.message));
+    }
+  }
+
   async getProduct(req, res, next) {
     try {
       const link = req.query.link || req.params.link;
