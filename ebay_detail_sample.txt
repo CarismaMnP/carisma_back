@@ -1,13 +1,13 @@
 {
-  "itemId": "v1|287041248304|0",
-  "title": "2017-2020 BMW 530i Dashboard A/C Heater Air Vent Grill OEM",
-  "shortDescription": "Model: BMW 530I. Search for more parts forBMW 530I. Local pickup option also available. Airbag Notification. Condition: 186k.",
+  "itemId": "v1|287045074186|0",
+  "title": "2020-2025 BMW 540i Front Left Driver Seat Control Module OEM 61355A36988901",
+  "shortDescription": "Model: BMW 540. Local pickup option also available.",
   "price": {
-    "value": "175.00",
+    "value": "80.00",
     "currency": "USD"
   },
-  "categoryPath": "eBay Motors|Parts & Accessories|Car & Truck Parts & Accessories|Air Conditioning & Heating|HVAC Controls & Control Units",
-  "categoryIdPath": "6000|6028|6030|33542|33545",
+  "categoryPath": "eBay Motors|Parts & Accessories|Car & Truck Parts & Accessories|Starters, Alternators, ECUs & Wiring|ECUs & Computer Modules",
+  "categoryIdPath": "6000|6028|6030|33572|33596",
   "condition": "Used",
   "conditionId": "3000",
   "itemLocation": {
@@ -17,49 +17,44 @@
     "country": "US"
   },
   "image": {
-    "imageUrl": "https://i.ebayimg.com/images/g/yNEAAeSw3B5pUuLm/s-l1600.jpg",
+    "imageUrl": "https://i.ebayimg.com/images/g/RRYAAeSwETNpVYvY/s-l1600.jpg",
     "width": 1600,
     "height": 900
   },
   "additionalImages": [
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/Dv0AAeSwng5pUuLn/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/Mc4AAeSwwJxpVYvZ/s-l1600.jpg",
       "width": 1600,
       "height": 900
     },
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/z54AAeSwPSVpUuLo/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/RqoAAeSwW2VpVYva/s-l1600.jpg",
       "width": 1600,
       "height": 900
     },
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/CXEAAeSwOPZpUuLp/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/KRkAAeSwePhpVYvb/s-l1600.jpg",
       "width": 1600,
       "height": 900
     },
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/1UQAAeSwZzBpUuLq/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/PTkAAeSwp3ZpVYvc/s-l1600.jpg",
       "width": 1600,
       "height": 900
     },
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/8yAAAeSwDv9pUuLr/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/HR4AAeSwkohpVYvd/s-l1600.jpg",
       "width": 1600,
       "height": 900
     },
     {
-      "imageUrl": "https://i.ebayimg.com/images/g/9SoAAeSwGCxpUuLs/s-l1600.jpg",
-      "width": 1600,
-      "height": 900
-    },
-    {
-      "imageUrl": "https://i.ebayimg.com/images/g/DZMAAeSwKtdpUuLt/s-l1600.jpg",
+      "imageUrl": "https://i.ebayimg.com/images/g/ZZ4AAeSwszBpVYve/s-l1600.jpg",
       "width": 1600,
       "height": 900
     }
   ],
   "brand": "BAVARIAN MOTOR WORKS (BMW)",
-  "itemCreationDate": "2025-12-29T20:22:07.000Z",
+  "itemCreationDate": "2025-12-31T20:47:28.000Z",
   "seller": {
     "username": "13b22f4gqdk",
     "feedbackPercentage": "100.0",
@@ -86,8 +81,8 @@
         "currency": "USD"
       },
       "quantityUsedForEstimate": 1,
-      "minEstimatedDeliveryDate": "2026-01-02T10:00:00.000Z",
-      "maxEstimatedDeliveryDate": "2026-01-06T10:00:00.000Z",
+      "minEstimatedDeliveryDate": "2026-01-09T10:00:00.000Z",
+      "maxEstimatedDeliveryDate": "2026-01-15T10:00:00.000Z",
       "additionalShippingCostPerUnit": {
         "value": "0.00",
         "currency": "USD"
@@ -801,32 +796,27 @@
     {
       "type": "STRING",
       "name": "ID",
-      "value": "47D09258-D1C8-4D83-BD67-1CF77ED1B366"
-    },
-    {
-      "type": "STRING",
-      "name": "Interchange",
-      "value": "655-10257"
+      "value": "1553D80E-D82E-43FD-973F-AB32C58A661E"
     },
     {
       "type": "STRING",
       "name": "Year",
-      "value": "18"
+      "value": "22"
     },
     {
       "type": "STRING",
       "name": "Model",
-      "value": "BMW 530I"
+      "value": "BMW 540"
     },
     {
       "type": "STRING",
       "name": "Stock",
-      "value": "250005"
+      "value": "250009"
     },
     {
       "type": "STRING",
       "name": "VIN #",
-      "value": "WBAJA7C58JG907604"
+      "value": "WBA73BJ09NWX56346"
     },
     {
       "type": "STRING",
@@ -838,8 +828,8 @@
   "buyingOptions": [
     "FIXED_PRICE"
   ],
-  "itemWebUrl": "https://www.ebay.com/itm/287041248304",
-  "description": "<!doctype HTML>\n<html>\n<head>\n  <meta charset=\"utf-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CARisma M&amp;P</title>\n  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n  <link href=\"https://fonts.googleapis.com/css2?family=Goldman:wght@400;700&family=Noto+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&display=swap\" rel=\"stylesheet\">\n  <link href=\"https://templates.car-part.com/9032/ebay/style_1-5b.css\" rel=\"stylesheet\" type=\"text/css\" />\n  <!-- link href=\"style_1-5b.css\" rel=\"stylesheet\" type=\"text/css\" / -->\n</head>\n\n<body>\n<div id=\"cpcm_body\">\n  <div id=\"cpcm_etHeader\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  <div id=\"cpcm_logo\"><img src=\"https://templates.car-part.com/9032/ebay/graphics/logo.png\" alt=\"CARisma M&amp;P\" /></div>\n  <!-- div id=\"cpcm_logo\"><img src=\"graphics/logo.png\" alt=\"CARisma M&amp;P\" /></div -->\n  <div id=\"cpcm_info\">\n <h1 id=\"cpcm_bizName\">CARisma M&amp;P</h1>\n <div id=\"cpcm_location\">Jacksonville, FL</div>\n  </div>\n  </div>  \n  </div>\n  \n  <div id=\"cpcm_bizHours\" class=\"cpcm_btcf\">\n  <span class=\"cpcm_hours cpcm_block\">Business Hours (EST/EDT)</span>\n  <span class=\"cpcm_time cpcm_wkdy cpcm_block\">Mon - Fri 8am - 5pm</span> \n  <span class=\"cpcm_time cpcm_sat cpcm_block\">Saturday 8am - 2pm</span>\n  <span class=\"cpcm_time cpcm_wknd cpcm_block\">Closed Sat &amp; Sun</span>\n  </div>\n  \n  <div id=\"cpcm_main\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  \n  <div id=\"cpcm_partImages\">\n <div class=\"cpcm_feature-image\">\n <img src=\"https://i.ebayimg.com/00/s/OTAwWDE2MDA=/z/yNEAAeSw3B5pUuLm/$_1.JPG?set_id=2\" alt=\"\" />\n </div>\n  </div>\n  \n  <div id=\"cpcm_sidebar\">\n <div class=\"cpcm_part-info\">\n <h1 id=\"cpcm_partName\">Heater A/c Control</h1>\n <ul id=\"cpcm_carInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-year\"><span class=\"cpcm_label\">Year:</span> <span class=\"cpcm_label-content\">18</span></li>\n <li id=\"cpcm_info-model\"><span class=\"cpcm_label\">Model:</span> <span class=\"cpcm_label-content\">BMW 530I</span></li>\n <li id=\"cpcm_info-side\"><span class=\"cpcm_label\">Side:</span> <span class=\"cpcm_label-content\"></span></li>\n </ul>\n <ul id=\"cpcm_partInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-type\"><span class=\"cpcm_label\">Type:</span> <span class=\"cpcm_label-content\">Used</span></li>\n <li id=\"cpcm_info-category\"><span class=\"cpcm_label\">Category:</span> <span class=\"cpcm_label-content\">W</span></li>\n <li id=\"cpcm_info-condition\"><span class=\"cpcm_label\">Condition:</span> <span class=\"cpcm_label-content\">186k</span></li>\n </ul>  \n <ul id=\"cpcm_stockInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-vin\"><span class=\"cpcm_label\">VIN:</span> <span class=\"cpcm_label-content\">WBAJA7C58JG907604</span></li>\n <li id=\"cpcm_info-vStock\"><span class=\"cpcm_label\">Vehicle Stock #:</span> <span class=\"cpcm_label-content\">250005</span></li>\n <li id=\"cpcm_info-pStock\"><span class=\"cpcm_label\">Part Stock #:</span> <span class=\"cpcm_label-content\">0000002979</span></li>\n <li id=\"cpcm_info-autDesc\"><span class=\"cpcm_label\">Vehicle Info:</span> <span class=\"cpcm_label-content\">2.0 AWD AT SEDAN WHITE, AUC#000-43212136</span></li>\n </ul>\n <ul id=\"cpcm_notesInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-description\"><span class=\"cpcm_label\">Additional notes:</span> <span class=\"cpcm_label-content\">(automatic Ac Control), Front, W/o 4 Zone Climate Control; W/o Heated Seats 2018, Bmw530i, Sedan 61316826876</span></li>\n </ul>\n <ul id=\"cpcm_interchange\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-iDesc\"><span class=\"cpcm_label\">Interchange:</span> <span class=\"cpcm_label-content\">(automatic AC control), front, w/o 4 zone climate control; w/o heated seats</span></li>\n <li id=\"cpcm_info-interchange\"><span class=\"cpcm_label\">Also fits:</span><br />\n <span class=\"cpcm_label-content\">BMW 530I 18-19 (automatic AC control), front, w/o 4 zone climate control; w/o heated seats<br>BMW 540 18-19 (automatic AC control), front, w/o 4 zone climate control; w/o heated seats<br>BMW 640I GT 18-19 (automatic AC control), front, w/o 4 zone climate control; w/o heated seats<br></span></li>\n </ul>\n </div>\n \n <a class=\"cpcm_noU\" href=\"https://www.ebay.com/sch/i.html?_dkr=1&iconV2Request=true&_blrs=recall_filtering&_ssn=carismamp&_oac=1&_nkw=250005\"><div id=\"cpcm_sameAUT\" class=\"cpcm_btn\">Search for more parts from this donor vehicle</div></a>\n <a class=\"cpcm_noU\" href=\"https://www.ebay.com/sch/i.html?_dkr=1&iconV2Request=true&_blrs=recall_filtering&_ssn=carismamp&_oac=1&_nkw=BMW 530I\"><div id=\"cpcm_sameModel\" class=\"cpcm_btn\">Search for more parts for <span class=\"cpcm_label-content\">BMW 530I</span></div></a>\n  </div>\n  \n  <div id=\"cpcm_content\" class=\"cpcm_btcf\">\n \n <div id=\"cpcm_airbag\" class=\"cpcm_content-area\">\n <h1>Airbag Notification</h1>\n <p>If the item above is an airbag, <strong>I certify this airbag is not subject to recall and will be shipped in accordance with hazmat shipping requirements</strong>.</p>\n </div>\n \n <div id=\"cpcm_payment\" class=\"cpcm_content-area\">\n <h1>Payment</h1>\n <ul>\n <li>We accept Visa, MasterCard, American Express, and payments transacted through eBay Managed Payments</li>\n <li>Sales tax collected by eBay where applicable</li>\n </ul>\n </div>\n \n <div id=\"cpcm_shipping\" class=\"cpcm_content-area\">\n <h1>Shipping</h1>\n <ul>\n <li>We ship by FedEx, UPS, USPS, and regional freight/LTL carriers.</li>\n <li>Items shipped by freight MUST be shipped to a business with a dock or forklift access; otherwise, liftgate and/or residential delivery fees may apply.</li>\n <li>Most items ship within 24 hours of payment; items paid for on the weekend or holidays ship on the following business day.</li>\n <li>Any free shipping we offer is for the continental United States only. If you are from Hawaii, Alaska, or a Territory of the United States, please request a shipping total before bidding and we will do our best to keep the cost low.</li>\n  <li>Local pickup option also available.</li>\n </ul>\n </div>\n \n <div id=\"cpcm_warranty\" class=\"cpcm_content-area\">\n <h1>Warranty &amp; Returns</h1>\n <ul>\n   <li>30-day standard warranty on all parts</li>\n </ul>\n <p>Please verify fitment independently prior to purchase, as the information in the \"compatibility\" section above is generated by eBay Motors and not from us. If you have questions or concerns about fitment, please contact us prior to purchase.</p>\n </div>\n \n <div id=\"cpcm_contact\" class=\"cpcm_content-area\">\n  <h1>Contact Us</h1>\n <p>If you have any questions regarding an eBay item, please CONTACT US via <a href=\"https://contact.ebay.com/ws/eBayISAPI.dll?FindAnswers&requested=carismamp\" target=\"_blank\">eBay messaging</a> before you make the purchase.</p>\n <p>Please verify fitment independently prior to purchase, as the information in the \"compatibility\" section above is generated by eBay Motors and not from us. If you have questions or concerns about fitment, please contact us prior to purchase.</p>\n <p>After you have received your product in satisfactory condition, please leave us positive feedback. If there is a problem with your purchase, do not leave neutral or negative feedback: CONTACT US so that we can help you to resolve your issue to your satisfaction.</p>\n </div>\n  </div>\n  </div>\n  </div>\n\n  <div id=\"cpcm_footer\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  <div id=\"cpcm_credit\">\n Powered by <div id=\"cpcm_cmLogo\">Checkmate</div>\n  </div>\n  </div>\n  </div>\n</div>\n</body>\n</html>",
+  "itemWebUrl": "https://www.ebay.com/itm/287045074186",
+  "description": "<!doctype HTML>\n<html>\n<head>\n  <meta charset=\"utf-8\"/>\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>CARisma M&amp;P</title>\n  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n  <link href=\"https://fonts.googleapis.com/css2?family=Goldman:wght@400;700&family=Noto+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&display=swap\" rel=\"stylesheet\">\n  <link href=\"https://templates.car-part.com/9032/ebay/style_1-5b.css\" rel=\"stylesheet\" type=\"text/css\" />\n  <!-- link href=\"style_1-5b.css\" rel=\"stylesheet\" type=\"text/css\" / -->\n</head>\n\n<body>\n<div id=\"cpcm_body\">\n  <div id=\"cpcm_etHeader\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  <div id=\"cpcm_logo\"><img src=\"https://templates.car-part.com/9032/ebay/graphics/logo.png\" alt=\"CARisma M&amp;P\" /></div>\n  <!-- div id=\"cpcm_logo\"><img src=\"graphics/logo.png\" alt=\"CARisma M&amp;P\" /></div -->\n  <div id=\"cpcm_info\">\n <h1 id=\"cpcm_bizName\">CARisma M&amp;P</h1>\n <div id=\"cpcm_location\">Jacksonville, FL</div>\n  </div>\n  </div>  \n  </div>\n  \n  <div id=\"cpcm_bizHours\" class=\"cpcm_btcf\">\n  <span class=\"cpcm_hours cpcm_block\">Business Hours (EST/EDT)</span>\n  <span class=\"cpcm_time cpcm_wkdy cpcm_block\">Mon - Fri 8am - 5pm</span> \n  <span class=\"cpcm_time cpcm_sat cpcm_block\">Saturday 8am - 2pm</span>\n  <span class=\"cpcm_time cpcm_wknd cpcm_block\">Closed Sat &amp; Sun</span>\n  </div>\n  \n  <div id=\"cpcm_main\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  \n  <div id=\"cpcm_partImages\">\n <div class=\"cpcm_feature-image\">\n <img src=\"https://i.ebayimg.com/00/s/OTAwWDE2MDA=/z/RRYAAeSwETNpVYvY/$_1.JPG?set_id=2\" alt=\"\" />\n </div>\n  </div>\n  \n  <div id=\"cpcm_sidebar\">\n <div class=\"cpcm_part-info\">\n <h1 id=\"cpcm_partName\">Chassis Brain Box</h1>\n <ul id=\"cpcm_carInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-year\"><span class=\"cpcm_label\">Year:</span> <span class=\"cpcm_label-content\">22</span></li>\n <li id=\"cpcm_info-model\"><span class=\"cpcm_label\">Model:</span> <span class=\"cpcm_label-content\">BMW 540</span></li>\n <li id=\"cpcm_info-side\"><span class=\"cpcm_label\">Side:</span> <span class=\"cpcm_label-content\"></span></li>\n </ul>\n <ul id=\"cpcm_partInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-type\"><span class=\"cpcm_label\">Type:</span> <span class=\"cpcm_label-content\">Used</span></li>\n <li id=\"cpcm_info-category\"><span class=\"cpcm_label\">Category:</span> <span class=\"cpcm_label-content\">W</span></li>\n <li id=\"cpcm_info-condition\"><span class=\"cpcm_label\">Condition:</span> <span class=\"cpcm_label-content\"></span></li>\n </ul>  \n <ul id=\"cpcm_stockInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-vin\"><span class=\"cpcm_label\">VIN:</span> <span class=\"cpcm_label-content\">WBA73BJ09NWX56346</span></li>\n <li id=\"cpcm_info-vStock\"><span class=\"cpcm_label\">Vehicle Stock #:</span> <span class=\"cpcm_label-content\">250009</span></li>\n <li id=\"cpcm_info-pStock\"><span class=\"cpcm_label\">Part Stock #:</span> <span class=\"cpcm_label-content\">0000002798</span></li>\n <li id=\"cpcm_info-autDesc\"><span class=\"cpcm_label\">Vehicle Info:</span> <span class=\"cpcm_label-content\">3.0 AWD SEDAN Black. 000-41476038</span></li>\n </ul>\n <ul id=\"cpcm_notesInfo\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-description\"><span class=\"cpcm_label\">Additional notes:</span> <span class=\"cpcm_label-content\">Front Left Driver Seat Control Module 61355a36988901, 2022, Bmw 540i, Xdrive</span></li>\n </ul>\n <ul id=\"cpcm_interchange\" class=\"cpcm_info-group\">\n <li id=\"cpcm_info-iDesc\"><span class=\"cpcm_label\">Interchange:</span> <span class=\"cpcm_label-content\"></span></li>\n <li id=\"cpcm_info-interchange\"><span class=\"cpcm_label\">Also fits:</span><br />\n <span class=\"cpcm_label-content\"></span></li>\n </ul>\n </div>\n \n <a class=\"cpcm_noU\" href=\"https://www.ebay.com/sch/i.html?_dkr=1&iconV2Request=true&_blrs=recall_filtering&_ssn=carismamp&_oac=1&_nkw=250009\"><div id=\"cpcm_sameAUT\" class=\"cpcm_btn\">Search for more parts from this donor vehicle</div></a>\n <a class=\"cpcm_noU\" href=\"https://www.ebay.com/sch/i.html?_dkr=1&iconV2Request=true&_blrs=recall_filtering&_ssn=carismamp&_oac=1&_nkw=BMW 540\"><div id=\"cpcm_sameModel\" class=\"cpcm_btn\">Search for more parts for <span class=\"cpcm_label-content\">BMW 540</span></div></a>\n  </div>\n  \n  <div id=\"cpcm_content\" class=\"cpcm_btcf\">\n \n <div id=\"cpcm_airbag\" class=\"cpcm_content-area\">\n <h1>Airbag Notification</h1>\n <p>If the item above is an airbag, <strong>I certify this airbag is not subject to recall and will be shipped in accordance with hazmat shipping requirements</strong>.</p>\n </div>\n \n <div id=\"cpcm_payment\" class=\"cpcm_content-area\">\n <h1>Payment</h1>\n <ul>\n <li>We accept Visa, MasterCard, American Express, and payments transacted through eBay Managed Payments</li>\n <li>Sales tax collected by eBay where applicable</li>\n </ul>\n </div>\n \n <div id=\"cpcm_shipping\" class=\"cpcm_content-area\">\n <h1>Shipping</h1>\n <ul>\n <li>We ship by FedEx, UPS, USPS, and regional freight/LTL carriers.</li>\n <li>Items shipped by freight MUST be shipped to a business with a dock or forklift access; otherwise, liftgate and/or residential delivery fees may apply.</li>\n <li>Most items ship within 24 hours of payment; items paid for on the weekend or holidays ship on the following business day.</li>\n <li>Any free shipping we offer is for the continental United States only. If you are from Hawaii, Alaska, or a Territory of the United States, please request a shipping total before bidding and we will do our best to keep the cost low.</li>\n  <li>Local pickup option also available.</li>\n </ul>\n </div>\n \n <div id=\"cpcm_warranty\" class=\"cpcm_content-area\">\n <h1>Warranty &amp; Returns</h1>\n <ul>\n   <li>30-day standard warranty on all parts</li>\n </ul>\n <p>Please verify fitment independently prior to purchase, as the information in the \"compatibility\" section above is generated by eBay Motors and not from us. If you have questions or concerns about fitment, please contact us prior to purchase.</p>\n </div>\n \n <div id=\"cpcm_contact\" class=\"cpcm_content-area\">\n  <h1>Contact Us</h1>\n <p>If you have any questions regarding an eBay item, please CONTACT US via <a href=\"https://contact.ebay.com/ws/eBayISAPI.dll?FindAnswers&requested=carismamp\" target=\"_blank\">eBay messaging</a> before you make the purchase.</p>\n <p>Please verify fitment independently prior to purchase, as the information in the \"compatibility\" section above is generated by eBay Motors and not from us. If you have questions or concerns about fitment, please contact us prior to purchase.</p>\n <p>After you have received your product in satisfactory condition, please leave us positive feedback. If there is a problem with your purchase, do not leave neutral or negative feedback: CONTACT US so that we can help you to resolve your issue to your satisfaction.</p>\n </div>\n  </div>\n  </div>\n  </div>\n\n  <div id=\"cpcm_footer\" class=\"cpcm_btcf\">\n  <div class=\"cpcm_container\">\n  <div id=\"cpcm_credit\">\n Powered by <div id=\"cpcm_cmLogo\">Checkmate</div>\n  </div>\n  </div>\n  </div>\n</div>\n</body>\n</html>",
   "paymentMethods": [
     {
       "paymentMethodType": "OTHER"
@@ -880,9 +870,9 @@
   "enabledForGuestCheckout": true,
   "eligibleForInlineCheckout": true,
   "lotSize": 0,
-  "legacyItemId": "287041248304",
+  "legacyItemId": "287045074186",
   "priorityListing": false,
   "adultOnly": false,
-  "categoryId": "33545",
+  "categoryId": "33596",
   "listingMarketplaceId": "EBAY_MOTORS_US"
 }

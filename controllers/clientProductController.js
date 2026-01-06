@@ -42,6 +42,13 @@ class ProductController {
   async getProducts(req, res, next) {
     try {
       const { model, category, name } = req.query;
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const requestedLimit = parseInt(req.query.limit, 10);
+      const limit =
+        Number.isFinite(requestedLimit) && requestedLimit > 0
+          ? Math.min(requestedLimit, 150)
+          : 150;
+      const offset = (page - 1) * limit;
 
       const where = {
         isDeleted: false,
@@ -52,15 +59,18 @@ class ProductController {
           : {}),
       };
 
-      const products = await Product.findAll({
+      const products = await Product.findAndCountAll({
         where,
         order: [
           ['ebayCategory', 'ASC'],
           ['name', 'ASC'],
         ],
+        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory"],
+        limit,
+        offset,
       });
 
-      const grouped = products.reduce((acc, product) => {
+      const grouped = products.rows.reduce((acc, product) => {
         const productPlain = product.get({ plain: true });
         const categoryKey = productPlain.ebayCategory || 'uncategorized';
 
@@ -78,7 +88,12 @@ class ProductController {
         }))
         .sort((a, b) => a.category.localeCompare(b.category));
 
-      return res.json(response);
+      return res.json({
+        total: products.count,
+        page,
+        limit,
+        data: response,
+      });
     } catch (e) {
       next(ApiError.badRequest(e.message));
     }
