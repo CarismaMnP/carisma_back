@@ -15,6 +15,24 @@ const start = async () => {
         // await sequelize.authenticate();
         await sequelize.sync();
 
+        await models.User.findOrCreate({
+            where: {
+
+                name : "Administrator",
+                mail : "info@carismamp.com",
+                phone : "89127864632",
+                password : "242CaRismA516716!@#",
+                role : "ADMINISTRATOR",
+                prevCodeDatetime : null,
+                wrongRecoveryCodeAttempts : 0,
+                recoveryCode : "",
+                category : "Basic",
+                discount : 0,
+                total : 0,
+                smsCode : null,
+            }
+        })
+
         // models.BlockData.findOrCreate({ 
         //     where: {
         //         name: "products"

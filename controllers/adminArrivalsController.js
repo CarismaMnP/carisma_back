@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const ApiError = require('../error/ApiError');
-const { s3 } = require('../db');
+const { s3, bucketName } = require('../db');
 const { Arrival } = require('../models/models');
 
 function makeKey(originalName) {
@@ -41,7 +41,7 @@ class AdminArrivalsController {
             if (file) {
                 const Key = makeKey(file.name);
                 await s3.send(new PutObjectCommand({
-                    Bucket: 'my-bucket',
+                    Bucket: bucketName,
                     Key,
                     Body: file.data,
                     ContentType: file.mimetype,
@@ -65,7 +65,7 @@ class AdminArrivalsController {
             if (file) {
                 const Key = makeKey(file.name);
                 await s3.send(new PutObjectCommand({
-                    Bucket: "my-bucket",
+                    Bucket: bucketName,
                     Key,
                     Body: file.data,
                     ContentType: file.mimetype,

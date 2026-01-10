@@ -195,17 +195,7 @@ class ProductController {
     try {
       const {link} = req.params;
 
-      const product = await Product.findOne({
-        where: {link},
-        include: [{
-          model: Category,
-          include: [{
-            model: Category,
-            as: 'parentCategory',
-            required: false
-          }]
-        }]
-      });
+      const product = await Product.findOne({where: {link}});
 
       return res.json(product)
     } catch (e) {

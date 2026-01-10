@@ -54,6 +54,7 @@ const Product = sequelize.define('product', {
   old_price: { type: DataTypes.FLOAT, unique: false, allowNull: false, defaultValue: 0 },
   // categoryId: { type: DataTypes.INTEGER, unique: false, allowNull: true },
   count: { type: DataTypes.INTEGER, unique: false, defaultValue: 0 },
+  isManual: { type: DataTypes.BOOLEAN, unique: false, allowNull: false, defaultValue: false },
 
   about: { type: DataTypes.TEXT, unique: false, allowNull: false, defaultValue: '' },
   // recipe: { type: DataTypes.JSON, unique: false, allowNull: true },

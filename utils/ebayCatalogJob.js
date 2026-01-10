@@ -78,6 +78,7 @@ const buildProductPayload = (detail) => {
     ebayCategoryId: detail.categoryId || null,
     ebayCategoryPath: categoryPathArray.length ? categoryPathArray : null,
     ebayCategory: categoryLeaf,
+    isManual: false,
   };
 };
 
@@ -116,6 +117,11 @@ const syncProductFromDetail = async (detail) => {
   const payload = buildProductPayload(detail);
   const existing = await Product.findOne({ where: { ebayItemId } });
 
+  if (existing && existing.isManual) {
+    console.log(`[eBay] Skip manual product for ${ebayItemId}, leaving untouched.`);
+    return;
+  }
+
   if (existing) {
     await existing.update(payload);
     console.log(`[eBay] Updated product for ${ebayItemId} (stock: ${payload.count}).`);
@@ -133,6 +139,10 @@ const maybeSyncItem = async (summary) => {
 
   const summaryStock = getStockFromAny(summary);
   const existing = await Product.findOne({ where: { ebayItemId } });
+
+  if (existing && existing.isManual) {
+    return;
+  }
 
   let needDetail = !existing;
   if (!needDetail && summaryStock === null) {

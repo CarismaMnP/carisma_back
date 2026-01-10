@@ -42,16 +42,18 @@ class ProductController {
     }
   }
 
-  async create(req, res, next) {
+  async createProduct(req, res, next, { isManual = false } = {}) {
+    console.log("createProduct")
     try {
       let files = req.files?.files;
-      if (!files.length) {
+      if (files && !Array.isArray(files)) {
         files = [files]
       }
       const {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
         region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits,
       } = JSON.parse(req.body.data);
 
       let filesPromises = []
@@ -75,24 +77,21 @@ class ProductController {
         console.log(files)
         filesPromises = files.map(async (file) => {
           if (file) {
-            // Загрузка оригинального изображения
             const upload = await s3.Upload({buffer: file.data}, '/products/');
-            const imageUrl = upload.Key;
+            const imageUrl = `https://pub-bc3786b523da4133a78648b83b419424.r2.dev/${upload.Key}`;
 
-            const previewBuffer = await sharp(file.data)
-              .resize(24, 24)
-              .toBuffer();
-
-            // Загрузка миниатюры на S3
-            const previewUpload = await s3.Upload({buffer: previewBuffer}, '/products/previews/');
-            const previewUrl = previewUpload.Key;
-
-            return {imageUrl, previewUrl}
+            return imageUrl
           }
+          return null;
         });
       }
 
-      const filesData = await Promise.all(filesPromises);
+      const filesData = (await Promise.all(filesPromises)).filter(Boolean);
+      const numericCount = count === undefined || count === null ? undefined : Number(count);
+      const normalizedCount = Number.isFinite(numericCount) ? numericCount : undefined;
+      const parsedEbayAlsoFits = Array.isArray(ebayAlsoFits)
+        ? ebayAlsoFits
+        : (typeof ebayAlsoFits === 'string' && ebayAlsoFits ? JSON.parse(ebayAlsoFits) : undefined);
 
       const product = await Product.create({
         name,
@@ -114,6 +113,14 @@ class ProductController {
         recipe: recipeJSON,
         additionalFields: additionalFieldsJSON,
         selector: selectorJSON,
+        ebayCategory: ebayCategory || null,
+        ebayModel: ebayModel || null,
+        ebayYear: ebayYear || null,
+        ebayAdditionalNotes: ebayAdditionalNotes || null,
+        ...(parsedEbayAlsoFits ? { ebayAlsoFits: parsedEbayAlsoFits } : {}),
+        ...(normalizedCount !== undefined ? { count: normalizedCount, ebayStock: normalizedCount } : {}),
+        ...(isManual ? { isManual: true } : {}),
+        description: description || '',
       });
 
       return res.json(product)
@@ -123,17 +130,26 @@ class ProductController {
     }
   }
 
+  async create(req, res, next) {
+    return this.createProduct(req, res, next, { isManual: false });
+  }
+
+  async createManual(req, res, next) {
+    return this.createProduct(req, res, next, { isManual: true });
+  }
+
   async update(req, res, next) {
     try {
       let files = req.files?.files;
-      if (!files.length) {
+      if (files && !Array.isArray(files)) {
         files = [files]
       }
       const {id} = req.query;
       const {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
-        region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector
+        region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits,
       } = JSON.parse(req.body.data);
 
 
@@ -158,7 +174,7 @@ class ProductController {
       if (files && files.length > 0) {
         filesPromises = files.map(async (file) => {
           if (file) {
-            // Загрузка оригинального изображения
+            // 袟邪谐褉褍蟹泻邪 芯褉懈谐懈薪邪谢褜薪芯谐芯 懈蟹芯斜褉邪卸械薪懈褟
             const upload = await s3.Upload({buffer: file.data}, '/products/');
             const imageUrl = upload.Key;
 
@@ -166,16 +182,22 @@ class ProductController {
               .resize(24, 24)
               .toBuffer();
 
-            // Загрузка миниатюры на S3
+            // 袟邪谐褉褍蟹泻邪 屑懈薪懈邪褌褞褉褘 薪邪 S3
             const previewUpload = await s3.Upload({buffer: previewBuffer}, '/products/previews/');
             const previewUrl = previewUpload.Key;
 
             return {imageUrl, previewUrl}
           }
+          return null;
         });
       }
 
-      const filesData = await Promise.all(filesPromises);
+      const filesData = (await Promise.all(filesPromises)).filter(Boolean);
+      const numericCount = count === undefined || count === null ? undefined : Number(count);
+      const normalizedCount = Number.isFinite(numericCount) ? numericCount : undefined;
+      const parsedEbayAlsoFits = Array.isArray(ebayAlsoFits)
+        ? ebayAlsoFits
+        : (typeof ebayAlsoFits === 'string' && ebayAlsoFits ? JSON.parse(ebayAlsoFits) : undefined);
 
       const product = await Product.update({
         name,
@@ -197,9 +219,39 @@ class ProductController {
         recipe: recipeJSON,
         additionalFields: additionalFieldsJSON,
         selector: selectorJSON,
+        ebayCategory: ebayCategory || null,
+        ebayModel: ebayModel || null,
+        ebayYear: ebayYear || null,
+        ebayAdditionalNotes: ebayAdditionalNotes || null,
+        ...(parsedEbayAlsoFits ? { ebayAlsoFits: parsedEbayAlsoFits } : {}),
+        ...(normalizedCount !== undefined ? { count: normalizedCount, ebayStock: normalizedCount } : {}),
+        description: description || '',
       }, {where: {id}});
 
       return res.json(product)
+    } catch (e) {
+      console.log(e)
+      next(ApiError.badRequest(e.message));
+    }
+  }
+
+  async getEbayCategories(req, res, next) {
+    try {
+      const categories = await Product.findAll({
+        where: { isDeleted: false },
+        attributes: ['ebayCategory'],
+        raw: true,
+      });
+
+      const uniqueCategories = Array.from(
+        new Set(
+          categories
+            .map((row) => (row.ebayCategory || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+      return res.json(uniqueCategories);
     } catch (e) {
       console.log(e)
       next(ApiError.badRequest(e.message));
