@@ -226,7 +226,7 @@ const scheduleEbayCatalogJob = () => {
   });
 
   // Run every 2 hours
-  cron.schedule('0 */2 * * *', async () => {
+  cron.schedule('0 */8 * * *', async () => {
     try {
       await runEbayCatalogPull();
     } catch (err) {
