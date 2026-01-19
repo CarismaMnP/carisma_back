@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const cron = require('node-cron');
 const { Product } = require('../models/models');
 const { fetchStoreCatalog, fetchItemDetail, fetchCompatibilityList, storeName, sellerId } = require('./ebayClient');
 const { extractCpcmVehicleData } = require('./extractDescription');
 
-const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const pageSize = Number(process.env.EBAY_CATALOG_LIMIT || 50);
 const querySeeds = (process.env.EBAY_QUERY_SEEDS || 'a,e,i,o,u,0,1,2,3,4,5,6,7,8,9')
   .split(',')
@@ -225,14 +225,15 @@ const scheduleEbayCatalogJob = () => {
     console.error('[eBay] Initial fetch failed:', details);
   });
 
-  setInterval(async () => {
+  // Run every 2 hours
+  cron.schedule('0 */2 * * *', async () => {
     try {
       await runEbayCatalogPull();
     } catch (err) {
       const details = err?.response?.data || err?.message || err;
       console.error('[eBay] Scheduled fetch failed:', details);
     }
-  }, THIRTY_MINUTES_MS);
+  });
 };
 
 module.exports = { scheduleEbayCatalogJob };

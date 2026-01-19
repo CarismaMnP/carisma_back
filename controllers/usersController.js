@@ -171,14 +171,19 @@ class UsersController {
 
   async fetchCart(req, res, next) {
     try {
-      const {userId, session} = req.query;
+      const userId = req.user?.id;
+      const {session} = req.query;
 
-      const or = [];
-      if (userId) or.push({userId});
-      if (session) or.push({session});
+      const filters = [];
+      if (userId) filters.push({userId});
+      if (session) filters.push({session});
+
+      if (filters.length === 0) {
+        return next(ApiError.badRequest('No userId or session provided'));
+      }
 
       const cartProducts = await CartProduct.findAll({
-        where: {[Op.or]: or},
+        where: filters.length === 1 ? filters[0] : {[Op.or]: filters},
         include: [{model: Product, required: true}],
         order: [["createdAt", "ASC"]]
       });
@@ -192,7 +197,9 @@ class UsersController {
 
   async plusCart(req, res, next) {
     try {
-      const {userId, session, productId, selectorValue} = req.body;
+      const userId = req.user?.id;
+      const {session, productId, selectorValue} = req.body;
+      const normalizedSelectorValue = selectorValue ?? '';
 
       if (!productId)
         return next(ApiError.badRequest('productId обязателен'));
@@ -204,23 +211,23 @@ class UsersController {
       if (!product)
         return next(ApiError.internal('Товар не найден'));
 
-      const or = [];
-      if (userId) or.push({userId});
-      if (session) or.push({session});
-
       const cartProduct = await CartProduct.findOne({
         where: {
           productId,
-          ...(!!selectorValue && {selectorValue}),
-          [Op.or]: or
+          selectorValue: normalizedSelectorValue,
+          ...(userId ? {userId} : {session})
         }
       });
 
       if (cartProduct) {
         await cartProduct.increment('count');
       } else {
-        const createData = {session, productId, count: 1, selectorValue};
-        if (userId) createData.userId = userId;
+        const createData = {
+          productId,
+          selectorValue: normalizedSelectorValue,
+          count: 1,
+          ...(userId ? {userId} : {session})
+        };
         await CartProduct.create(createData);
       }
 
@@ -232,7 +239,13 @@ class UsersController {
 
   async minusCart(req, res, next) {
     try {
-      const {userId, session, productId, selectorValue} = req.body;
+      const userId = req.user?.id;
+      const {session, productId, selectorValue} = req.body;
+      const normalizedSelectorValue = selectorValue ?? '';
+
+      if (!productId) {
+        return next(ApiError.badRequest('productId is required'));
+      }
 
       const product = await Product.findByPk(productId)
 
@@ -240,15 +253,15 @@ class UsersController {
         return next(ApiError.internal('Товар не найден'))
       }
 
-      const or = [];
-      if (userId) or.push({userId});
-      if (session) or.push({session});
+      if (!userId && !session) {
+        return next(ApiError.badRequest('袧褍卸械薪 谢懈斜芯 userId, 谢懈斜芯 session'));
+      }
 
       const cartProduct = await CartProduct.findOne({
         where: {
           productId,
-          ...(!!selectorValue && {selectorValue}),
-          [Op.or]: or
+          selectorValue: normalizedSelectorValue,
+          ...(userId ? {userId} : {session})
         }
       });
 
