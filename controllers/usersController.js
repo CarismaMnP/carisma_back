@@ -12,7 +12,105 @@ const newSMSCode = () => {
   return Math.floor(1000 + Math.random() * 9000)
 }
 
+// Функция генерации 6-значного кода для email логина
+// const generateEmailCode = () => {
+//   return Math.floor(100000 + Math.random() * 900000).toString()
+// }
+
+// Пока используем фиксированный код
+const generateEmailCode = () => {
+  return '123456'
+}
+
 class UsersController {
+  async loginEmail(req, res, next) {
+    try {
+      const {email} = req.body
+
+      if (!email || !email.includes('@')) {
+        return next(ApiError.badRequest('Неверный формат email'))
+      }
+
+      const code = generateEmailCode()
+      const codeExpiry = new Date(Date.now() + 5 * 60 * 1000) // 5 минут
+
+      const [findedUser, created] = await User.findOrCreate({
+        where: {email},
+        defaults: {email, emailLoginCode: code, emailLoginCodeExpiry: codeExpiry}
+      });
+
+      if (!created && findedUser?.id && findedUser?.email) {
+        await findedUser.update({
+          emailLoginCode: code,
+          emailLoginCodeExpiry: codeExpiry
+        })
+      }
+
+      // TODO: Отправка email с кодом
+      // В реальном приложении здесь должна быть отправка email
+      console.log(`Email login code for ${email}: ${code}`)
+
+      return res.json({email})
+
+    } catch (e) {
+      next(ApiError.badRequest(e.message))
+    }
+  }
+
+  async loginEmailCheck(req, res, next) {
+    try {
+      const {email, code, session} = req.body
+
+      if (!email || !email.includes('@')) {
+        return next(ApiError.badRequest('Неверный формат email'))
+      }
+
+      if (!code) {
+        return next(ApiError.badRequest('Код не указан'))
+      }
+
+      const findedUser = await User.findOne({where: {email}});
+
+      if (!findedUser?.id || !findedUser?.email) {
+        return next(ApiError.internal('Пользователь не найден'))
+      }
+
+      // Проверка срока действия кода
+      if (!findedUser.emailLoginCodeExpiry || new Date() > new Date(findedUser.emailLoginCodeExpiry)) {
+        return next(ApiError.unprocessable('Код истек. Запросите новый код'))
+      }
+
+      // Проверка кода
+      if (findedUser.emailLoginCode === code) {
+        // Очистка кода после успешной проверки
+        await findedUser.update({
+          emailLoginCode: null,
+          emailLoginCodeExpiry: null
+        })
+
+        const token = generateJwt(
+          findedUser.id,
+          findedUser?.name || '',
+          findedUser?.email || '',
+          findedUser?.phone || '',
+          findedUser?.role || ''
+        )
+
+        // Привязка корзины к пользователю
+        if (session) {
+          await CartProduct.update({userId: findedUser.id}, {where: {session, userId: null}})
+        }
+
+        return res.json({token, user: findedUser})
+      } else {
+        return next(ApiError.unprocessable('Неверный код'))
+      }
+
+    } catch (e) {
+      next(ApiError.badRequest(e.message))
+    }
+  }
+
   async login(req, res, next) {
     try {
       const {phone, session} = req.body

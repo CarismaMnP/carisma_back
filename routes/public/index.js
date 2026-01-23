@@ -11,6 +11,7 @@ const orderRouter = require('./orderRouter');
 const paymentsRouter = require('./paymentsRouter');
 const promotionRouter = require('./promotionRouter');
 const arrivalsRouter = require('./arrivalsRouter');
+const stripeWebhookRouter = require('./stripeWebhookRouter');
 
 router.use('/block', blockRouter);
 router.use('/order', orderRouter);
@@ -21,5 +22,6 @@ router.use('/recipe', recipeRouter);
 router.use('/payments', paymentsRouter);
 router.use('/promotion', promotionRouter);
 router.use('/arrivals', arrivalsRouter);
+router.use('/stripe-webhook', stripeWebhookRouter);
 
 module.exports = router

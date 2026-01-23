@@ -38,6 +38,10 @@ jobs:
           EBAY_QUERY: ${{ secrets.EBAY_QUERY }}
           EBAY_QUERY_SEEDS: ${{ secrets.EBAY_QUERY_SEEDS }}
           EBAY_COMPATIBILITY_ENABLED: ${{ secrets.EBAY_COMPATIBILITY_ENABLED }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
+          STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
         run: |
           cat <<EOF > .env.production
           PORT=$PORT
@@ -63,6 +67,10 @@ jobs:
           EBAY_QUERY=$EBAY_QUERY
           EBAY_QUERY_SEEDS=$EBAY_QUERY_SEEDS
           EBAY_COMPATIBILITY_ENABLED=$EBAY_COMPATIBILITY_ENABLED
+          STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY
+          STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET
+          STRIPE_SUCCESS_URL=$STRIPE_SUCCESS_URL
+          STRIPE_CANCEL_URL=$STRIPE_CANCEL_URL
           
           EOF
         shell: bash

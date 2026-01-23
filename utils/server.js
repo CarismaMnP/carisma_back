@@ -14,6 +14,10 @@ module.exports = function createServer() {
     app.use(fileUpload({}))
     app.use('/static', express.static(__dirname + '/public'));
     app.use(express.static('files'));
+
+    // Stripe webhook requires raw body for signature verification
+    app.use('/api/public/stripe-webhook', express.raw({ type: 'application/json' }));
+
     app.use(express.json())
     app.use('/api', router)
     app.use(errorHandler)

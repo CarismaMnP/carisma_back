@@ -1,11 +1,7 @@
 const ApiError = require('../error/ApiError')
-const { s3 } = require('../db');
-const sharp = require('sharp');
-const {Category, Product, Order, User, OrderProduct, CartProduct} = require('../models/models');
+const {Product, Order, User, OrderProduct, CartProduct} = require('../models/models');
 const updateUserCategory = require('../utils/updateUserCategory');
-const { Op } = require('sequelize');
 const { ClientService, ResponseCodes, ReceiptTypes, VAT, TaxationSystem } = require('cloudpayments'); 
-const CDEK = require('../utils/cdek');
 
 class OrderController {
     async check (req, res, next) {

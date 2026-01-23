@@ -49,7 +49,7 @@ const start = async () => {
         //     }
         // })
 
-        // scheduleEbayCatalogJob();
+        scheduleEbayCatalogJob();
         app.listen(PORT, () => console.log(`Server started on ${PORT}`));
     } catch (e) {
         console.error('Failed to start server:', e);

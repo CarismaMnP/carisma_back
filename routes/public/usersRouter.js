@@ -6,6 +6,8 @@ const optionalAuthMiddleware = require('../../middleware/optionalAuthMiddleware'
 
 router.post('/login', usersController.login)
 router.post('/login/sms', usersController.checkLoginSMSCode)
+router.post('/login/email', usersController.loginEmail)
+router.post('/login/email/check', usersController.loginEmailCheck)
 router.get('/check', authMiddleware, usersController.check)
 router.put('/', authMiddleware, usersController.update)
 // router.get('/find_email', usersController.find_mail)
