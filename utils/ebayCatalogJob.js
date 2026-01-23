@@ -127,7 +127,7 @@ const syncProductFromDetail = async (detail) => {
     console.log(`[eBay] Created product for ${ebayItemId} (stock: ${payload.count}).`);
   }
 
-  await saveSamples(detail);
+  // await saveSamples(detail);
 };
 
 const maybeSyncItem = async (summary) => {
