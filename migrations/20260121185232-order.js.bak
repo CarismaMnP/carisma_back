@@ -16,7 +16,7 @@ module.exports = {
       country: { type: DataTypes.STRING, allowNull: true },
       city: { type: DataTypes.STRING, allowNull: true },
       zip_code: { type: DataTypes.STRING, allowNull: true },
-      state: { type: DataTypes.STRING, allowNull: true },
+      addressState: { type: DataTypes.STRING, allowNull: true },
       address_line_1: { type: DataTypes.STRING, allowNull: true },
       address_line_2: { type: DataTypes.STRING, allowNull: true },
       delivery_instructions: { type: DataTypes.STRING, allowNull: true },

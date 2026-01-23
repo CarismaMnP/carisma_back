@@ -1,3 +1,28 @@
+/**
+ * Stripe Integration with Automatic Tax Calculation
+ *
+ * To enable automatic tax calculation:
+ *
+ * 1. Enable Stripe Tax in your Stripe Dashboard:
+ *    - Go to https://dashboard.stripe.com/settings/tax
+ *    - Click "Enable Stripe Tax"
+ *    - Configure your tax settings and tax registrations
+ *
+ * 2. Add tax codes to your products (already configured in code):
+ *    - We use 'txcd_99999999' (General - Tangible Goods) for auto parts
+ *    - See full list: https://stripe.com/docs/tax/tax-categories
+ *
+ * 3. Set up webhook endpoint in Stripe Dashboard:
+ *    - Go to https://dashboard.stripe.com/webhooks
+ *    - Add endpoint: https://your-domain.com/api/stripe/webhook
+ *    - Select events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed
+ *    - Copy the webhook secret to .env as STRIPE_WEBHOOK_SECRET
+ *
+ * 4. Test in Stripe test mode using test addresses:
+ *    - Use address with state "CA" (California) for high tax rates
+ *    - Use card: 4242 4242 4242 4242 for successful payments
+ */
+
 const Stripe = require('stripe');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -9,11 +34,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * @param {number} params.amount - Amount in USD
  * @param {string} params.customerEmail - Customer email
  * @param {Array} params.lineItems - Array of line items
+ * @param {Object} params.shippingAddress - Shipping address for tax calculation
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, shippingAddress }) {
   try {
-    const session = await stripe.checkout.sessions.create({
+    const sessionConfig = {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
@@ -28,7 +54,36 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
           orderId: orderId,
         },
       },
-    });
+      // Enable automatic tax calculation
+      automatic_tax: {
+        enabled: true,
+      },
+    };
+
+    // Add shipping address if provided (required for tax calculation)
+    if (shippingAddress) {
+      sessionConfig.shipping_address_collection = {
+        allowed_countries: ['US'], // Можно добавить другие страны
+      };
+
+      // Pre-fill shipping details if available
+      if (shippingAddress.name && shippingAddress.line1 && shippingAddress.city && shippingAddress.state && shippingAddress.postal_code && shippingAddress.country) {
+        sessionConfig.shipping_options = [
+          {
+            shipping_rate_data: {
+              type: 'fixed_amount',
+              fixed_amount: {
+                amount: 0, // Укажите стоимость доставки в центах
+                currency: 'usd',
+              },
+              display_name: 'Standard Shipping',
+            },
+          },
+        ];
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return {
       url: session.url,

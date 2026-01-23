@@ -35,11 +35,11 @@ class UsersController {
       const codeExpiry = new Date(Date.now() + 5 * 60 * 1000) // 5 минут
 
       const [findedUser, created] = await User.findOrCreate({
-        where: {email},
-        defaults: {email, emailLoginCode: code, emailLoginCodeExpiry: codeExpiry}
+        where: {mail: email},
+        defaults: {mail: email, emailLoginCode: code, emailLoginCodeExpiry: codeExpiry}
       });
 
-      if (!created && findedUser?.id && findedUser?.email) {
+      if (!created && findedUser?.id && findedUser?.mail) {
         await findedUser.update({
           emailLoginCode: code,
           emailLoginCodeExpiry: codeExpiry
@@ -69,9 +69,9 @@ class UsersController {
         return next(ApiError.badRequest('Код не указан'))
       }
 
-      const findedUser = await User.findOne({where: {email}});
+      const findedUser = await User.findOne({where: {mail: email}});
 
-      if (!findedUser?.id || !findedUser?.email) {
+      if (!findedUser?.id || !findedUser?.mail) {
         return next(ApiError.internal('Пользователь не найден'))
       }
 
@@ -91,7 +91,7 @@ class UsersController {
         const token = generateJwt(
           findedUser.id,
           findedUser?.name || '',
-          findedUser?.email || '',
+          findedUser?.mail || '',
           findedUser?.phone || '',
           findedUser?.role || ''
         )

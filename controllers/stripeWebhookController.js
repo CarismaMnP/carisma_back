@@ -1,5 +1,5 @@
 const { Order } = require('../models/models');
-const { verifyWebhookSignature } = require('../utils/stripe');
+const { verifyWebhookSignature, getCheckoutSession } = require('../utils/stripe');
 
 class StripeWebhookController {
     async handleWebhook(req, res) {
@@ -99,13 +99,22 @@ class StripeWebhookController {
             return;
         }
 
+        // Retrieve full session details to get tax information
+        const fullSession = await getCheckoutSession(session.id);
+
+        // Extract tax and total information
+        const tax = fullSession.total_details?.amount_tax || 0;
+        const total = fullSession.amount_total || 0;
+
         // Update order state to confirmed if payment was successful immediately
         if (session.payment_status === 'paid') {
             await order.update({
                 state: 'confirmed',
-                stripePaymentIntentId: session.payment_intent
+                stripePaymentIntentId: session.payment_intent,
+                tax: tax / 100, // Convert from cents to dollars
+                total: total / 100, // Convert from cents to dollars
             });
-            console.log(`Order ${orderId} confirmed - payment completed`);
+            console.log(`Order ${orderId} confirmed - payment completed. Tax: $${tax / 100}, Total: $${total / 100}`);
         }
     }
 
