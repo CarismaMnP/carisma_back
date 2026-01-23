@@ -1,7 +1,48 @@
-const { Order } = require('../models/models');
+const { Order, CartProduct, OrderProduct, Product } = require('../models/models');
 const { verifyWebhookSignature, getCheckoutSession } = require('../utils/stripe');
 
 class StripeWebhookController {
+    /**
+     * Reduce product count after successful order payment
+     * For eBay products (isManual = false), set count to 0
+     * For manual products (isManual = true), decrease count by ordered amount
+     */
+    async decreaseProductStock(orderId) {
+        try {
+            // Get all products from the order
+            const orderProducts = await OrderProduct.findAll({
+                where: { orderId },
+                include: [{ model: Product, required: true }]
+            });
+
+            for (const orderProduct of orderProducts) {
+                const product = orderProduct.product;
+                const orderedCount = orderProduct.count;
+
+                if (!product) {
+                    console.error(`Product not found for OrderProduct ${orderProduct.id}`);
+                    continue;
+                }
+
+                if (product.isManual === false) {
+                    // eBay товар - обнуляем count
+                    await product.update({ count: 0 });
+                    console.log(`eBay product ${product.id} (${product.name}) - set count to 0`);
+                } else {
+                    // Ручной товар - уменьшаем count на количество в заказе
+                    const newCount = Math.max(0, product.count - orderedCount);
+                    await product.update({ count: newCount });
+                    console.log(`Manual product ${product.id} (${product.name}) - decreased count from ${product.count} to ${newCount}`);
+                }
+            }
+
+            console.log(`Stock decreased for order ${orderId}`);
+        } catch (error) {
+            console.error(`Error decreasing stock for order ${orderId}:`, error);
+            throw error;
+        }
+    }
+
     async handleWebhook(req, res) {
         const signature = req.headers['stripe-signature'];
         const payload = req.body;
@@ -115,6 +156,18 @@ class StripeWebhookController {
                 total: total / 100, // Convert from cents to dollars
             });
             console.log(`Order ${orderId} confirmed - payment completed. Tax: $${tax / 100}, Total: $${total / 100}`);
+
+            // Clear user's cart after successful payment
+            const userId = order.userId;
+            if (userId) {
+                const deletedCount = await CartProduct.destroy({
+                    where: { userId }
+                });
+                console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
+            }
+
+            // Decrease product stock
+            await this.decreaseProductStock(orderId);
         }
     }
 
@@ -138,6 +191,18 @@ class StripeWebhookController {
             stripePaymentIntentId: session.payment_intent
         });
         console.log(`Order ${orderId} confirmed - async payment succeeded`);
+
+        // Clear user's cart after successful payment
+        const userId = order.userId;
+        if (userId) {
+            const deletedCount = await CartProduct.destroy({
+                where: { userId }
+            });
+            console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
+        }
+
+        // Decrease product stock
+        await this.decreaseProductStock(orderId);
     }
 
     async handleCheckoutSessionAsyncPaymentFailed(session) {
@@ -198,6 +263,18 @@ class StripeWebhookController {
             stripePaymentIntentId: paymentIntent.id
         });
         console.log(`Order ${orderId} confirmed via payment_intent.succeeded`);
+
+        // Clear user's cart after successful payment
+        const userId = order.userId;
+        if (userId) {
+            const deletedCount = await CartProduct.destroy({
+                where: { userId }
+            });
+            console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
+        }
+
+        // Decrease product stock
+        await this.decreaseProductStock(orderId);
     }
 
     async handlePaymentIntentFailed(paymentIntent) {

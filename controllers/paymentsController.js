@@ -1,6 +1,5 @@
 const ApiError = require('../error/ApiError')
 const {Product, Order, User, OrderProduct, CartProduct} = require('../models/models');
-const updateUserCategory = require('../utils/updateUserCategory');
 const { ClientService, ResponseCodes, ReceiptTypes, VAT, TaxationSystem } = require('cloudpayments'); 
 
 class OrderController {
@@ -79,84 +78,7 @@ class OrderController {
             return next(ApiError.badRequest(e.message));
         }
     }
-    
-    async pay (req, res, next) {
-        try {
-            console.log("pay request")
 
-            const client = new ClientService({
-                publicId:  process.env.CP_PUBLIC_ID,
-                privateKey: process.env.CP_PRIVATE_KEY
-            });
-
-            const handlers = client.getNotificationHandlers();
-
-            const response = await handlers.handlePayRequest(req, async (request) => {
-                const order = await Order.findByPk(request.InvoiceId);
-                if (!order) return ResponseCodes.FAIL;
-
-                if (order.state === 'paid') {
-                    await CDEK.createCDEKOrder(order.id)
-                    return ResponseCodes.SUCCESS;
-                }
-
-                await Order.update({ state: 'paid' }, {where: {id: order.id}});
-                await CartProduct.destroy({where: {userId: order.userId}})
-
-                await updateUserCategory(order.userId)
-                await CDEK.createCDEKOrder(order.id)
-
-                return ResponseCodes.SUCCESS;
-            });
-
-            console.log("Payment checked")
-
-            res.setHeader('Content-Type', 'application/json');
-            return res.end(JSON.stringify(response.response));
-
-        } catch (e) {
-            console.log(e)
-            return next(ApiError.badRequest(e.message));
-        }
-    }
-    
-    async confirm (req, res, next) {
-        try {
-            console.log("pay confirm")
-
-            const client = new ClientService({
-                publicId:  process.env.CP_PUBLIC_ID,
-                privateKey: process.env.CP_PRIVATE_KEY
-            });
-
-            const handlers = client.getNotificationHandlers();
-
-            const response = await handlers.handleConfirmRequest(req, async (request) => {
-                const order = await Order.findByPk(request.InvoiceId);
-                if (!order) return ResponseCodes.FAIL;
-
-                if (order.state === 'paid') {
-                await CDEK.createCDEKOrder(order.id)
-                return ResponseCodes.SUCCESS;
-                }
-
-                await Order.update({ state: 'paid' }, {where: {id: order.id}});
-                await CartProduct.destroy({where: {userId: order.userId}})
-
-                await updateUserCategory(order.userId)
-                await CDEK.createCDEKOrder(order.id)
-                
-                return ResponseCodes.SUCCESS;
-            });
-
-            console.log("Payment checked")
-            return res.json(response);
-
-        } catch (e) {
-            console.log(e)
-            return next(ApiError.badRequest(e.message));
-        }
-    }
     
     async receipt (req, res, next) {
         try {

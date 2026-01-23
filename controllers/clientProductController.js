@@ -9,7 +9,7 @@ class ProductController {
     try {
       const products = await Product.findAll({
         attributes: ['ebayModel', 'ebayCategory'],
-        where: { isDeleted: false },
+        where: { isDeleted: false, count: {[Op.ne]: 0} },
         raw: true,
       });
 
@@ -104,7 +104,7 @@ class ProductController {
       const limit = 12;
 
       const products = await Product.findAll({
-        where: { isDeleted: false },
+        where: { isDeleted: false, count: {[Op.ne]: 0} },
         order: [['createdAt', 'DESC']],
         attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory"],
         limit,
@@ -164,6 +164,7 @@ class ProductController {
         categories = await Category.findAll({
           where: {
             isDeleted: false,
+            count: {[Op.ne]: 0},
             [Op.or]: [{id: categoryId}, {parentId: categoryId}]
           }
         })
@@ -175,6 +176,7 @@ class ProductController {
         where: {
           ...(!!regionsArray?.length ? {region: {[Op.in]: regionsArray}} : {}),
           isDeleted: false,
+          count: {[Op.ne]: 0},
           ...(categoryId ? {categoryId: {[Op.in]: categoryIds}} : {}),
         },
         limit, offset, order: [['name', 'ASC']], include: [{model: Category}]
@@ -270,74 +272,74 @@ class ProductController {
     }
   }
 
-  async update(req, res, next) {
-    try {
-      const files = req.files?.files;
-      const {id} = req.query;
-      const {
-        name, description, link, price, old_price, categoryId,
-        about, weight, variation, processing, fermentation,
-        region, farmer, keyDescriptor
-      } = JSON.parse(req.body.data);
+  // async update(req, res, next) {
+  //   try {
+  //     const files = req.files?.files;
+  //     const {id} = req.query;
+  //     const {
+  //       name, description, link, price, old_price, categoryId,
+  //       about, weight, variation, processing, fermentation,
+  //       region, farmer, keyDescriptor
+  //     } = JSON.parse(req.body.data);
 
-      let filesPromises = []
+  //     let filesPromises = []
 
-      if (files && files.length > 0) {
-        filesPromises = files.map(async (file) => {
-          if (file) {
-            // Загрузка оригинального изображения
-            const upload = await s3.Upload({buffer: file.data}, '/products/');
-            const imageUrl = upload.Key;
+  //     if (files && files.length > 0) {
+  //       filesPromises = files.map(async (file) => {
+  //         if (file) {
+  //           // Загрузка оригинального изображения
+  //           const upload = await s3.Upload({buffer: file.data}, '/products/');
+  //           const imageUrl = upload.Key;
 
-            const previewBuffer = await sharp(file.data)
-              .resize(24, 24)
-              .toBuffer();
+  //           const previewBuffer = await sharp(file.data)
+  //             .resize(24, 24)
+  //             .toBuffer();
 
-            // Загрузка миниатюры на S3
-            const previewUpload = await s3.Upload({buffer: previewBuffer}, '/products/previews/');
-            const previewUrl = previewUpload.Key;
+  //           // Загрузка миниатюры на S3
+  //           const previewUpload = await s3.Upload({buffer: previewBuffer}, '/products/previews/');
+  //           const previewUrl = previewUpload.Key;
 
-            return {imageUrl, previewUrl}
-          }
-        });
-      }
+  //           return {imageUrl, previewUrl}
+  //         }
+  //       });
+  //     }
 
-      const filesData = await Promise.all(filesPromises);
+  //     const filesData = await Promise.all(filesPromises);
 
-      const product = await Product.update({
-        name,
-        description,
-        link,
-        price,
-        old_price,
-        categoryId,
-        about,
-        weight,
-        variation,
-        processing,
-        fermentation,
-        region,
-        farmer,
-        keyDescriptor,
-        images: filesData
-      }, {where: {id}});
+  //     const product = await Product.update({
+  //       name,
+  //       description,
+  //       link,
+  //       price,
+  //       old_price,
+  //       categoryId,
+  //       about,
+  //       weight,
+  //       variation,
+  //       processing,
+  //       fermentation,
+  //       region,
+  //       farmer,
+  //       keyDescriptor,
+  //       images: filesData
+  //     }, {where: {id}});
 
-      return res.json(product)
-    } catch (e) {
-      console.log(e)
-      next(ApiError.badRequest(e.message));
-    }
-  }
+  //     return res.json(product)
+  //   } catch (e) {
+  //     console.log(e)
+  //     next(ApiError.badRequest(e.message));
+  //   }
+  // }
 
-  async delete(req, res, next) {
-    try {
-      let {id} = req.query;
-      await Product.update({isDeleted: true}, {where: {id}})
-      return res.json("Deleted successfully");
-    } catch (e) {
-      next(ApiError.badRequest(e.message))
-    }
-  }
+  // async delete(req, res, next) {
+  //   try {
+  //     let {id} = req.query;
+  //     await Product.update({isDeleted: true}, {where: {id}})
+  //     return res.json("Deleted successfully");
+  //   } catch (e) {
+  //     next(ApiError.badRequest(e.message))
+  //   }
+  // }
 }
 
 module.exports = new ProductController()

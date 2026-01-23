@@ -171,6 +171,51 @@ const maybeSyncItem = async (summary) => {
   }
 };
 
+/**
+ * Mark eBay products as sold (count = 0) if they are missing from current sync
+ * This happens when products are sold on eBay and no longer appear in the catalog
+ */
+const markMissingProductsAsSold = async (syncedItems) => {
+  try {
+    // Get all eBay item IDs from current sync
+    const syncedEbayItemIds = syncedItems.map(item => item.itemId).filter(Boolean);
+
+    // Find all eBay products in DB (isManual = false, count > 0)
+    const allEbayProducts = await Product.findAll({
+      where: {
+        isManual: false,
+        count: { [require('sequelize').Op.gt]: 0 }
+      },
+      attributes: ['id', 'ebayItemId', 'name', 'count']
+    });
+
+    let markedCount = 0;
+
+    // Check each eBay product in DB
+    for (const product of allEbayProducts) {
+      if (!product.ebayItemId) {
+        console.log(`[eBay] Product ${product.id} has isManual=false but no ebayItemId, skipping.`);
+        continue;
+      }
+
+      // If product's ebayItemId is NOT in the synced list, it was sold on eBay
+      if (!syncedEbayItemIds.includes(product.ebayItemId)) {
+        await product.update({ count: 0 });
+        console.log(`[eBay] Product ${product.id} (${product.name}) - eBay item ${product.ebayItemId} not found in sync, set count to 0 (sold on eBay)`);
+        markedCount++;
+      }
+    }
+
+    if (markedCount > 0) {
+      console.log(`[eBay] Marked ${markedCount} products as sold (count = 0) - they were sold on eBay.`);
+    } else {
+      console.log(`[eBay] No products needed to be marked as sold.`);
+    }
+  } catch (error) {
+    console.error('[eBay] Error marking missing products as sold:', error);
+  }
+};
+
 const fetchAllForQuery = async (query) => {
   let offset = 0;
   const collected = [];
@@ -226,6 +271,9 @@ const runEbayCatalogPull = async () => {
   for (const item of uniqueItems) {
     await maybeSyncItem(item);
   }
+
+  // Mark products as sold (count = 0) if they didn't appear in eBay sync
+  await markMissingProductsAsSold(uniqueItems);
 
   console.log('[eBay] Sync pass completed.');
 };

@@ -2,7 +2,6 @@ const ApiError = require('../error/ApiError')
 const { s3 } = require('../db');
 const sharp = require('sharp');
 const {Category, Product, Order, User, OrderProduct} = require('../models/models');
-const updateUserCategory = require('../utils/updateUserCategory');
 
 class OrderController {
     async fetch (req, res, next) {
@@ -66,8 +65,8 @@ class OrderController {
         try {
             let {id} = req.query;
             const order = await Order.update({state: "canceled"}, {where: {id}, returning: true})
-            const updatedOrder = order[1][0]
-            await updateUserCategory(updatedOrder.userId)
+            // const updatedOrder = order[1][0]
+            // await updateUserCategory(updatedOrder.userId)
             return res.json("Canceled successfully");
         } catch (e) {
             next(ApiError.badRequest(e.message))
