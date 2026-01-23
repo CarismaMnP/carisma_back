@@ -10,6 +10,21 @@ const PORT = process.env.PORT || 5050;
 
 const app = createServer();
 
+// Глобальные обработчики ошибок - предотвращают краш процесса
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // НЕ выходим из процесса, просто логируем
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // В production лучше перезапустить процесс после критической ошибки
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Restarting process in 5 seconds...');
+    setTimeout(() => process.exit(1), 5000);
+  }
+});
+
 const start = async () => {
     try {
         // await sequelize.authenticate();
@@ -33,7 +48,7 @@ const start = async () => {
             }
         })
 
-        // models.BlockData.findOrCreate({ 
+        // models.BlockData.findOrCreate({
         //     where: {
         //         name: "products"
         //     },
@@ -49,8 +64,23 @@ const start = async () => {
         //     }
         // })
 
-        scheduleEbayCatalogJob();
-        app.listen(PORT, () => console.log(`Server started on ${PORT}`));
+        // Запускать cron jobs только если не отключены
+        // Используйте DISABLE_CRON_JOBS=true для API реплик
+        const shouldRunCronJobs = process.env.DISABLE_CRON_JOBS !== 'true';
+
+        if (shouldRunCronJobs) {
+            console.log('[Cron] Starting eBay catalog sync job...');
+            scheduleEbayCatalogJob();
+        } else {
+            console.log('[Cron] Skipping cron jobs (DISABLE_CRON_JOBS=true)');
+        }
+
+        // Запускать HTTP сервер только если не worker mode
+        if (process.env.CRON_JOBS_ONLY !== 'true') {
+            app.listen(PORT, () => console.log(`Server started on ${PORT}`));
+        } else {
+            console.log('[Worker] Running as cron worker, HTTP server disabled');
+        }
     } catch (e) {
         console.error('Failed to start server:', e);
     }
