@@ -52,6 +52,7 @@ class ProductController {
 
       const where = {
         isDeleted: false,
+        count: {[Op.ne]: 0},
         ...(model ? { ebayModel: model } : {}),
         ...(category ? { ebayCategory: category } : {}),
         ...(name
