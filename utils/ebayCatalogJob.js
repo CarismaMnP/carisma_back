@@ -6,10 +6,7 @@ const { fetchStoreCatalog, fetchItemDetail, fetchCompatibilityList, storeName, s
 const { extractCpcmVehicleData } = require('./extractDescription');
 
 const pageSize = Number(process.env.EBAY_CATALOG_LIMIT || 50);
-const querySeeds = (process.env.EBAY_QUERY_SEEDS || 'a,e,i,o,u,0,1,2,3,4,5,6,7,8,9')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+// УДАЛЕНО: querySeeds больше не используется - теперь делаем один запрос вместо множества
 const compatibilityEnabled = String(process.env.EBAY_COMPATIBILITY_ENABLED || 'true').toLowerCase() === 'true';
 
 let sampleDetailSaved = false;
@@ -180,13 +177,17 @@ const fetchAllForQuery = async (query) => {
   const limit = pageSize;
 
   while (true) {
-    const { items } = await fetchStoreCatalog({ limit, offset, query });
+    const { items, total } = await fetchStoreCatalog({ limit, offset, query });
 
     if (!items.length) {
       break;
     }
 
     collected.push(...items);
+
+    // Логируем прогресс
+    console.log(`[eBay] Fetched ${collected.length}/${total || '?'} items (offset: ${offset})...`);
+
     if (items.length < limit) {
       break;
     }
@@ -199,13 +200,23 @@ const fetchAllForQuery = async (query) => {
 
 const runEbayCatalogPull = async () => {
   console.log(
-    `[eBay] Fetching catalog for store "${storeName}" (seller ${sellerId}) using seeds [${querySeeds.join(', ')}]...`
+    `[eBay] Fetching catalog for store "${storeName}" (seller ${sellerId})...`
   );
+
+  // ОПТИМИЗАЦИЯ: Используем минимальный набор широких запросов
+  // вместо 15 seeds. Для автозапчастей используем общие термины.
+  // eBay API требует обязательный query параметр, поэтому используем
+  // наиболее покрывающие ключевые слова для вашего каталога.
+
+  // Вариант 1: Используем несколько широких терминов (2-3 запроса вместо 15)
+  const queryTerms = ['OEM']
+
   const dedupMap = new Map();
 
-  for (const seed of querySeeds) {
-    const items = await fetchAllForQuery(seed);
-    console.log(`[eBay] Seed "${seed}" returned ${items.length} items.`);
+  for (const term of queryTerms) {
+    console.log(`[eBay] Fetching items for query "${term}"...`);
+    const items = await fetchAllForQuery(term);
+    console.log(`[eBay] Query "${term}" returned ${items.length} items.`);
     items.forEach((item) => dedupMap.set(item.itemId, item));
   }
 

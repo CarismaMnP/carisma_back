@@ -47,13 +47,20 @@ const getAccessToken = async () => {
 const fetchStoreCatalog = async ({ limit = defaultLimit, offset = 0, query = defaultQuery } = {}) => {
   const token = await getAccessToken();
 
+  // eBay API требует обязательный параметр q
+  // Используем минимальный query (один символ) + фильтр по seller
+  // Это получит все товары продавца, содержащие хотя бы один символ в названии
+  const effectiveQuery = (query && query.trim() !== '') ? query : 'a';
+
+  const params = {
+    q: effectiveQuery,
+    limit,
+    offset,
+    filter: `sellers:{${sellerId}}`,
+  };
+
   const response = await axios.get(EBAY_BROWSE_URL, {
-    params: {
-      q: query,
-      limit,
-      offset,
-      filter: `sellers:{${sellerId}}`,
-    },
+    params,
     headers: {
       Authorization: `Bearer ${token}`,
       'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
