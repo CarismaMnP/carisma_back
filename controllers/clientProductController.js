@@ -8,30 +8,43 @@ class ProductController {
   async getFilter(req, res, next) {
     try {
       const products = await Product.findAll({
-        attributes: ['ebayModel', 'ebayCategory'],
+        attributes: ['make', 'ebayModel', 'ebayCategory'],
         where: { isDeleted: false, count: {[Op.ne]: 0} },
         raw: true,
       });
 
+      // Group by make -> model -> categories
       const grouped = new Map();
 
-      products.forEach(({ ebayModel, ebayCategory }) => {
+      products.forEach(({ make, ebayModel, ebayCategory }) => {
+        const makeKey = (make || 'Other').trim();
         const modelKey = (ebayModel || '').trim();
         if (!modelKey) return;
 
-        const categories = grouped.get(modelKey) || new Set();
-        if (ebayCategory) {
-          categories.add(ebayCategory.trim());
+        if (!grouped.has(makeKey)) {
+          grouped.set(makeKey, new Map());
         }
-        grouped.set(modelKey, categories);
+        const makeGroup = grouped.get(makeKey);
+
+        if (!makeGroup.has(modelKey)) {
+          makeGroup.set(modelKey, new Set());
+        }
+        if (ebayCategory) {
+          makeGroup.get(modelKey).add(ebayCategory.trim());
+        }
       });
 
       const response = Array.from(grouped.entries())
-        .map(([model, categories]) => ({
-          model,
-          categories: Array.from(categories).sort((a, b) => a.localeCompare(b)),
+        .map(([make, models]) => ({
+          make,
+          models: Array.from(models.entries())
+            .map(([model, categories]) => ({
+              model,
+              categories: Array.from(categories).sort((a, b) => a.localeCompare(b)),
+            }))
+            .sort((a, b) => a.model.localeCompare(b.model)),
         }))
-        .sort((a, b) => a.model.localeCompare(b.model));
+        .sort((a, b) => a.make.localeCompare(b.make));
 
       return res.json(response);
     } catch (e) {
@@ -41,7 +54,7 @@ class ProductController {
 
   async getProducts(req, res, next) {
     try {
-      const { model, category, name } = req.query;
+      const { make, model, category, name } = req.query;
       const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
       const requestedLimit = parseInt(req.query.limit, 10);
       const limit =
@@ -53,6 +66,7 @@ class ProductController {
       const where = {
         isDeleted: false,
         count: {[Op.ne]: 0},
+        ...(make ? { make } : {}),
         ...(model ? { ebayModel: model } : {}),
         ...(category ? { ebayCategory: category } : {}),
         ...(name
@@ -66,7 +80,7 @@ class ProductController {
           ['ebayCategory', 'ASC'],
           ['name', 'ASC'],
         ],
-        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory"],
+        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory", "make"],
         limit,
         offset,
       });
@@ -107,7 +121,7 @@ class ProductController {
       const products = await Product.findAll({
         where: { isDeleted: false, count: {[Op.ne]: 0} },
         order: [['createdAt', 'DESC']],
-        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory"],
+        attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory", "make"],
         limit,
       });
 

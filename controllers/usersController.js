@@ -4,6 +4,7 @@ const {User, Order, CartProduct, Product, Session} = require('../models/models')
 const axios = require("axios");
 const Op = require('sequelize').Op;
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
+const { sendVerificationCode, sendClientRequest } = require('../utils/mailer');
 
 const generateJwt = (id, name, mail, phone, role) => {
   return jwt.sign({id, name, mail, phone, role}, process.env.SECRET_KEY, {expiresIn: '72h'})
@@ -13,13 +14,8 @@ const newSMSCode = () => {
 }
 
 // Функция генерации 6-значного кода для email логина
-// const generateEmailCode = () => {
-//   return Math.floor(100000 + Math.random() * 900000).toString()
-// }
-
-// Пока используем фиксированный код
 const generateEmailCode = () => {
-  return '123456'
+  return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
 class UsersController {
@@ -28,7 +24,7 @@ class UsersController {
       const {email} = req.body
 
       if (!email || !email.includes('@')) {
-        return next(ApiError.badRequest('Неверный формат email'))
+        return next(ApiError.badRequest('Please put your correct email address'))
       }
 
       const code = generateEmailCode()
@@ -46,9 +42,13 @@ class UsersController {
         })
       }
 
-      // TODO: Отправка email с кодом
-      // В реальном приложении здесь должна быть отправка email
-      console.log(`Email login code for ${email}: ${code}`)
+      // Send verification code via email
+      try {
+        await sendVerificationCode(email, code)
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError)
+        return next(ApiError.internal('Failed to send verification email. Please try again later.'))
+      }
 
       return res.json({email})
 
@@ -62,7 +62,7 @@ class UsersController {
       const {email, code, session} = req.body
 
       if (!email || !email.includes('@')) {
-        return next(ApiError.badRequest('Неверный формат email'))
+        return next(ApiError.badRequest('Please put your correct email address'))
       }
 
       if (!code) {
@@ -103,7 +103,7 @@ class UsersController {
 
         return res.json({token, user: findedUser})
       } else {
-        return next(ApiError.unprocessable('Неверный код'))
+        return next(ApiError.unprocessable('Invalid code'))
       }
 
     } catch (e) {
@@ -116,7 +116,7 @@ class UsersController {
       const {phone, session} = req.body
 
       if (!phoneUtil.isValidNumberForRegion(phoneUtil.parse(phone, 'RU'), 'RU')) {
-        return next(ApiError.internal('Неверный формат номера'))
+        return next(ApiError.internal('Please put your correct phone number'))
       }
       const code = newSMSCode()
 
@@ -169,7 +169,7 @@ class UsersController {
 
     try {
       if (!phoneUtil.isValidNumberForRegion(phoneUtil.parse(phone, 'RU'), 'RU')) {
-        return next(ApiError.internal('Неверный формат номера'))
+        return next(ApiError.internal('Please put your correct phone number'))
       }
 
       const findedUser = await User.findOne({where: {phone}});
@@ -185,7 +185,7 @@ class UsersController {
 
           return res.json({token, user: findedUser})
         } else {
-          next(ApiError.unprocessable('Неверный код'))
+          next(ApiError.unprocessable('Invalid code'))
         }
       }
 
@@ -376,6 +376,29 @@ class UsersController {
       return res.json("success");
     } catch (e) {
       return next(ApiError.badRequest(e.message))
+    }
+  }
+
+  async submitPartRequest(req, res, next) {
+    try {
+      const { make, model, generation, email, partDescription } = req.body;
+
+      if (!email || !email.includes('@')) {
+        return next(ApiError.badRequest('Please provide a valid email address'));
+      }
+
+      await sendClientRequest({
+        make,
+        model,
+        generation,
+        email,
+        partDescription,
+      });
+
+      return res.json({ success: true, message: 'Request submitted successfully' });
+    } catch (e) {
+      console.error('Failed to submit part request:', e);
+      return next(ApiError.internal('Failed to submit request. Please try again later.'));
     }
   }
 }

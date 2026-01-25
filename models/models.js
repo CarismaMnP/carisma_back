@@ -88,6 +88,7 @@ const Product = sequelize.define('product', {
   ebayCategoryId: { type: DataTypes.STRING, unique: false, allowNull: true },
   ebayCategoryPath: { type: DataTypes.JSON, unique: false, allowNull: true },
   ebayCategory: { type: DataTypes.STRING, unique: false, allowNull: true },
+  make: { type: DataTypes.STRING, unique: false, allowNull: true },
 });
 
 const Order = sequelize.define('order', {

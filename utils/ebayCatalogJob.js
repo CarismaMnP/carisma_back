@@ -33,6 +33,34 @@ const getStockFromAny = (data) => {
   return null;
 };
 
+/**
+ * Extract make (BMW, Audi, Mercedes-Benz) from eBay brand field
+ * Brand examples: "BAVARIAN MOTOR WORKS (BMW)", "AUDI", "MERCEDES-BENZ"
+ */
+const extractMake = (brand) => {
+  if (!brand) return 'BMW'; // Default to BMW
+
+  const brandUpper = brand.toUpperCase();
+
+  // Check for BMW variations
+  if (brandUpper.includes('BMW') || brandUpper.includes('BAVARIAN')) {
+    return 'BMW';
+  }
+
+  // Check for Audi
+  if (brandUpper.includes('AUDI')) {
+    return 'Audi';
+  }
+
+  // Check for Mercedes-Benz variations
+  if (brandUpper.includes('MERCEDES') || brandUpper.includes('BENZ')) {
+    return 'Mercedes-Benz';
+  }
+
+  // Return original brand if not matched
+  return brand;
+};
+
 const buildProductPayload = (detail) => {
   const descData = extractCpcmVehicleData(detail.description || '');
   const priceValue = Number(detail?.price?.value) || 0;
@@ -48,6 +76,9 @@ const buildProductPayload = (detail) => {
     .map((s) => s.trim())
     .filter(Boolean);
   const categoryLeaf = categoryPathArray.slice(-1)[0] || null;
+
+  // Extract make from brand field
+  const make = detail.brand;
 
   return {
     name: detail.title || 'eBay item',
@@ -76,6 +107,7 @@ const buildProductPayload = (detail) => {
     ebayCategoryPath: categoryPathArray.length ? categoryPathArray : null,
     ebayCategory: categoryLeaf,
     isManual: false,
+    make,
   };
 };
 

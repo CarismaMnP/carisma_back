@@ -43,7 +43,7 @@ class OrderController {
                         currency: 'usd',
                         product_data: {
                             name: prod.name,
-                            description: prod.description || '',
+                            description: prod.about || '',
                             // Tax code для автозапчастей - можно изменить на нужный
                             // Список кодов: https://stripe.com/docs/tax/tax-categories
                             tax_code: 'txcd_99999999', // General - Tangible Goods

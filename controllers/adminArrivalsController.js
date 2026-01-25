@@ -49,7 +49,7 @@ class AdminArrivalsController {
                 imageURL = Key;
             }
 
-            const created = await Arrival.create({ model, body, year, imageURL });
+            const created = await Arrival.create({ model, body, year, imageURL: `https://pub-bc3786b523da4133a78648b83b419424.r2.dev/${imageURL}` });
             return res.json(created);
         } catch (e) { next(ApiError.badRequest(e.message)); }
     }
@@ -85,7 +85,7 @@ class AdminArrivalsController {
     async delete(req, res, next) {
         try {
             const { id } = req.query;
-            await Arrival.delete({ where: { id } });
+            await Arrival.destroy({ where: { id } });
             return res.json('Deleted successfully');
         } catch (e) { next(ApiError.badRequest(e.message)); }
     }

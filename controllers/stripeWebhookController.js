@@ -1,5 +1,6 @@
 const { Order, CartProduct, OrderProduct, Product } = require('../models/models');
 const { verifyWebhookSignature, getCheckoutSession } = require('../utils/stripe');
+const { sendOrderConfirmation } = require('../utils/mailer');
 
 class StripeWebhookController {
     /**
@@ -168,6 +169,51 @@ class StripeWebhookController {
 
             // Decrease product stock
             await this.decreaseProductStock(orderId);
+
+            // Send order confirmation email
+            await this.sendOrderConfirmationEmail(order);
+        }
+    }
+
+    /**
+     * Send order confirmation email with product details
+     */
+    async sendOrderConfirmationEmail(order) {
+        try {
+            const orderProducts = await OrderProduct.findAll({
+                where: { orderId: order.id },
+                include: [{ model: Product, required: true }]
+            });
+
+            const products = orderProducts.map(op => ({
+                name: op.product.name,
+                count: op.count,
+                price: op.product.price,
+            }));
+
+            const shippingAddress = order.delivey_type === 'ups' && order.address_line_1 ? {
+                name: order.fullName,
+                line1: order.address_line_1,
+                line2: order.address_line_2,
+                city: order.city,
+                state: order.addressState,
+                postal_code: order.zip_code,
+                country: order.country || 'US',
+            } : null;
+
+            await sendOrderConfirmation({
+                email: order.mail,
+                orderId: order.id,
+                fullName: order.fullName,
+                products,
+                subtotal: order.sum,
+                tax: order.tax || 0,
+                total: order.total || order.sum,
+                shippingAddress,
+            });
+        } catch (error) {
+            console.error(`Error sending order confirmation email for order ${order.id}:`, error);
+            // Don't throw - email failure shouldn't break the webhook
         }
     }
 
@@ -203,6 +249,9 @@ class StripeWebhookController {
 
         // Decrease product stock
         await this.decreaseProductStock(orderId);
+
+        // Send order confirmation email
+        await this.sendOrderConfirmationEmail(order);
     }
 
     async handleCheckoutSessionAsyncPaymentFailed(session) {
@@ -275,6 +324,9 @@ class StripeWebhookController {
 
         // Decrease product stock
         await this.decreaseProductStock(orderId);
+
+        // Send order confirmation email
+        await this.sendOrderConfirmationEmail(order);
     }
 
     async handlePaymentIntentFailed(paymentIntent) {
