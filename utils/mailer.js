@@ -18,6 +18,9 @@ const transporter = nodemailer.createTransport({
  * @param {string} code - Verification code
  */
 async function sendVerificationCode(email, code) {
+  console.log("sendVerificationCode")
+  console.log(process.env.SMTP_LOGIN)
+  console.log(process.env.SMTP_PASS)
   const mailOptions = {
     from: '"CARisma M&P" <info@mailer.carismamp.com>',
     to: email,
