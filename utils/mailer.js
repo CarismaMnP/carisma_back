@@ -10,8 +10,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-
-
 /**
  * Send verification code email for login
  * @param {string} email - Recipient email
