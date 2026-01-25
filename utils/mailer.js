@@ -5,8 +5,8 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: 'info@mailer.carismamp.com',
-    pass: '242CaRismA516716!@#',
+    user: process.env.SMTP_LOGIN,
+    pass: process.env.SMTP_PASS,
   },
 });
 

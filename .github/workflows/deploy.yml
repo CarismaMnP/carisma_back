@@ -42,6 +42,8 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
           STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
+          SMTP_LOGIN: ${{ secrets.SMTP_LOGIN }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
         run: |
           cat <<EOF > .env.production
           PORT=$PORT
@@ -71,6 +73,8 @@ jobs:
           STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET
           STRIPE_SUCCESS_URL=$STRIPE_SUCCESS_URL
           STRIPE_CANCEL_URL=$STRIPE_CANCEL_URL
+          SMTP_LOGIN=$SMTP_LOGIN
+          SMTP_PASS=$SMTP_PASS
           
           EOF
         shell: bash
