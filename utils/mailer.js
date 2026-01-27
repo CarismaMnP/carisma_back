@@ -133,6 +133,76 @@ async function sendOrderConfirmation({ email, orderId, fullName, products, subto
   }
 }
 
+async function sendOrderNotification({ email, orderId, fullName, products, subtotal, tax, total, shippingAddress }) {
+  const productRows = products.map(p => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #eee;">${p.name}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${p.count}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${(p.price * p.count).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const shippingSection = shippingAddress ? `
+    <div style="margin-top: 20px;">
+      <h3 style="color: #333; margin-bottom: 10px;">Shipping Address</h3>
+      <p style="margin: 0; color: #555;">
+        ${shippingAddress.name || fullName}<br>
+        ${shippingAddress.line1}<br>
+        ${shippingAddress.line2 ? shippingAddress.line2 + '<br>' : ''}
+        ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postal_code}<br>
+        ${shippingAddress.country}
+      </p>
+    </div>
+  ` : '';
+
+  const mailOptions = {
+    from: '"CARisma M&P" <info@mailer.carismamp.com>',
+    to: email,
+    subject: `Order Notification #${orderId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">You got new order!</h2>
+        <div style="background-color: #f9f9f9; padding: 15px; margin: 20px 0; border-radius: 5px;">
+          <p style="margin: 0;"><strong>Order Number:</strong> #${orderId}</p>
+        </div>
+
+        <h3 style="color: #333;">Order Details</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #f4f4f4;">
+              <th style="padding: 10px; text-align: left;">Product</th>
+              <th style="padding: 10px; text-align: center;">Qty</th>
+              <th style="padding: 10px; text-align: right;">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productRows}
+          </tbody>
+        </table>
+
+        <div style="margin-top: 20px; text-align: right;">
+          <p style="margin: 5px 0;"><strong>Subtotal:</strong> $${subtotal.toFixed(2)}</p>
+          <p style="margin: 5px 0;"><strong>Tax:</strong> $${tax.toFixed(2)}</p>
+          <p style="margin: 5px 0; font-size: 18px;"><strong>Total:</strong> $${total.toFixed(2)}</p>
+        </div>
+
+        ${shippingSection}
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #888; font-size: 12px;">Carisma Auto Parts</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Order confirmation sent to ${email} for order ${orderId}`);
+  } catch (error) {
+    console.error('Error sending order confirmation email:', error);
+    throw error;
+  }
+}
+
 /**
  * Send client part request email to business
  * @param {Object} params - Request parameters
@@ -194,4 +264,5 @@ module.exports = {
   sendVerificationCode,
   sendOrderConfirmation,
   sendClientRequest,
+  sendOrderNotification
 };

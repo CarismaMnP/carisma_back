@@ -1,6 +1,6 @@
 const { Order, CartProduct, OrderProduct, Product } = require('../models/models');
 const { verifyWebhookSignature, getCheckoutSession } = require('../utils/stripe');
-const { sendOrderConfirmation } = require('../utils/mailer');
+const { sendOrderConfirmation, sendOrderNotification } = require('../utils/mailer');
 
 class StripeWebhookController {
     /**
@@ -203,6 +203,17 @@ class StripeWebhookController {
 
             await sendOrderConfirmation({
                 email: order.mail,
+                orderId: order.id,
+                fullName: order.fullName,
+                products,
+                subtotal: order.sum,
+                tax: order.tax || 0,
+                total: order.total || order.sum,
+                shippingAddress,
+            });
+            
+            await sendOrderNotification({
+                email: "info@carismamp.com",
                 orderId: order.id,
                 fullName: order.fullName,
                 products,
