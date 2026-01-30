@@ -173,17 +173,19 @@ GET /api/admin/product/makes
 
 ---
 
-## 5. Получение всех категорий
+## 5. Получение всех уникальных категорий eBay
 
 ### `GET /api/admin/product/categories`
 
-**Описание:** Возвращает список всех категорий товаров
+**Описание:** Возвращает список всех уникальных категорий eBay (`ebayCategory`) из товаров
 
 **Query параметры:** нет
 
 **Особенности:**
-- Возвращает полные объекты категорий (не только названия)
-- Сортировка по имени категории
+- Возвращает только непустые значения
+- Удаляет пробелы по краям
+- Отфильтрованы удалённые товары (`isDeleted: false`)
+- Сортировка по алфавиту
 
 **Пример запроса:**
 ```http
@@ -193,27 +195,11 @@ GET /api/admin/product/categories
 **Пример ответа:**
 ```json
 [
-  {
-    "id": 1,
-    "name": "Body Parts",
-    "link": "body-parts",
-    "createdAt": "2025-01-15T08:00:00.000Z",
-    "updatedAt": "2025-01-15T08:00:00.000Z"
-  },
-  {
-    "id": 2,
-    "name": "Engine Parts",
-    "link": "engine-parts",
-    "createdAt": "2025-01-15T08:00:00.000Z",
-    "updatedAt": "2025-01-15T08:00:00.000Z"
-  },
-  {
-    "id": 3,
-    "name": "Lights & Lighting",
-    "link": "lights-lighting",
-    "createdAt": "2025-01-15T08:00:00.000Z",
-    "updatedAt": "2025-01-15T08:00:00.000Z"
-  }
+  "Motors:Parts & Accessories:Car & Truck Parts",
+  "Motors:Parts & Accessories:Car & Truck Parts:Body Parts",
+  "Motors:Parts & Accessories:Car & Truck Parts:Engine Parts",
+  "Motors:Parts & Accessories:Car & Truck Parts:Interior",
+  "Motors:Parts & Accessories:Car & Truck Parts:Lights & Lighting"
 ]
 ```
 
@@ -229,10 +215,10 @@ const makesResponse = await fetch('/api/admin/product/makes');
 const makes = await makesResponse.json();
 // ["Audi", "BMW", "Mercedes-Benz", ...]
 
-// 2. Получить список всех категорий
+// 2. Получить список всех категорий eBay
 const categoriesResponse = await fetch('/api/admin/product/categories');
 const categories = await categoriesResponse.json();
-// [{id: 1, name: "Body Parts", ...}, ...]
+// ["Motors:Parts & Accessories:Car & Truck Parts", "Motors:Parts & Accessories:Car & Truck Parts:Body Parts", ...]
 
 // 3. Отфильтровать товары по марке BMW
 const productsResponse = await fetch('/api/admin/product?search=BMW&page=1&limit=50');
@@ -323,8 +309,8 @@ const bmwProducts = await searchProducts('BMW', 1);
    - Обновлён метод `fetch()` - добавлен поиск и изменена сортировка
    - Обновлён метод `createProduct()` - добавлено поле `make`
    - Обновлён метод `update()` - добавлено поле `make`
-   - Добавлен метод `getMakes()` - получение уникальных марок
-   - Добавлен метод `getAllCategories()` - получение всех категорий
+   - Добавлен метод `getMakes()` - получение уникальных марок из поля `make`
+   - Добавлен метод `getAllCategories()` - получение уникальных категорий eBay из поля `ebayCategory`
 
 2. [routes/admin/productRouter.js](routes/admin/productRouter.js)
    - Добавлен маршрут `GET /makes`
@@ -346,5 +332,5 @@ const bmwProducts = await searchProducts('BMW', 1);
 - [ ] Добавить поле поиска по названию
 - [ ] Добавить поле `make` в форму создания/редактирования товара
 - [ ] Использовать `/makes` для автокомплита марок
-- [ ] Использовать `/categories` для выпадающего списка категорий
+- [ ] Использовать `/categories` для автокомплита/выпадающего списка категорий eBay
 - [ ] Проверить что сортировка от новых к старым работает корректно

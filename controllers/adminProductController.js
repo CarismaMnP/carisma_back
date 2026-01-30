@@ -295,11 +295,21 @@ class ProductController {
 
   async getAllCategories(req, res, next) {
     try {
-      const categories = await Category.findAll({
-        order: [['name', 'ASC']],
+      const categories = await Product.findAll({
+        where: { isDeleted: false },
+        attributes: ['ebayCategory'],
+        raw: true,
       });
 
-      return res.json(categories);
+      const uniqueCategories = Array.from(
+        new Set(
+          categories
+            .map((row) => (row.ebayCategory || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+      return res.json(uniqueCategories);
     } catch (e) {
       console.log(e)
       next(ApiError.badRequest(e.message));
