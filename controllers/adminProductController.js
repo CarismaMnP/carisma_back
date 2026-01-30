@@ -3,18 +3,28 @@ const {s3} = require('../db');
 const sharp = require('sharp');
 const {Category, Product} = require('../models/models');
 const { v4 } = require('uuid');
+const { Op } = require('sequelize');
 
 class ProductController {
   async fetch(req, res, next) {
     try {
-      let {page, limit} = req.query
+      let {page, limit, search} = req.query
       page = page || 1
       limit = limit || 1000
       let offset = page * limit - limit
+
+      const whereClause = {}
+      if (search) {
+        whereClause.name = {
+          [Op.like]: `%${search}%`
+        }
+      }
+
       const products = await Product.findAndCountAll({
+        where: whereClause,
         limit,
         offset,
-        order: [['name', 'ASC']],
+        order: [['createdAt', 'DESC']],
         include: [{model: Category}]
       })
       return res.json(products)
@@ -53,7 +63,7 @@ class ProductController {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
         region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
-        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make,
       } = JSON.parse(req.body.data);
 
       let filesPromises = []
@@ -117,6 +127,7 @@ class ProductController {
         ebayModel: ebayModel || null,
         ebayYear: ebayYear || null,
         ebayAdditionalNotes: ebayAdditionalNotes || null,
+        make: make || null,
         ...(parsedEbayAlsoFits ? { ebayAlsoFits: parsedEbayAlsoFits } : {}),
         ...(normalizedCount !== undefined ? { count: normalizedCount, ebayStock: normalizedCount } : {}),
         ...(isManual ? { isManual: true } : {}),
@@ -149,7 +160,7 @@ class ProductController {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
         region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
-        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make,
       } = JSON.parse(req.body.data);
 
 
@@ -223,6 +234,7 @@ class ProductController {
         ebayModel: ebayModel || null,
         ebayYear: ebayYear || null,
         ebayAdditionalNotes: ebayAdditionalNotes || null,
+        make: make || null,
         ...(parsedEbayAlsoFits ? { ebayAlsoFits: parsedEbayAlsoFits } : {}),
         ...(normalizedCount !== undefined ? { count: normalizedCount, ebayStock: normalizedCount } : {}),
         description: description || '',
@@ -252,6 +264,42 @@ class ProductController {
       ).sort((a, b) => a.localeCompare(b));
 
       return res.json(uniqueCategories);
+    } catch (e) {
+      console.log(e)
+      next(ApiError.badRequest(e.message));
+    }
+  }
+
+  async getMakes(req, res, next) {
+    try {
+      const makes = await Product.findAll({
+        where: { isDeleted: false },
+        attributes: ['make'],
+        raw: true,
+      });
+
+      const uniqueMakes = Array.from(
+        new Set(
+          makes
+            .map((row) => (row.make || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+
+      return res.json(uniqueMakes);
+    } catch (e) {
+      console.log(e)
+      next(ApiError.badRequest(e.message));
+    }
+  }
+
+  async getAllCategories(req, res, next) {
+    try {
+      const categories = await Category.findAll({
+        order: [['name', 'ASC']],
+      });
+
+      return res.json(categories);
     } catch (e) {
       console.log(e)
       next(ApiError.badRequest(e.message));
