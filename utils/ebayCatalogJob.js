@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
-const { Product } = require('../models/models');
+const { Product, OrderProduct } = require('../models/models');
 const { fetchStoreCatalog, fetchItemDetail, fetchCompatibilityList, storeName, sellerId } = require('./ebayClient');
 const { extractCpcmVehicleData } = require('./extractDescription');
 
@@ -59,6 +59,25 @@ const extractMake = (brand) => {
 
   // Return original brand if not matched
   return brand;
+};
+
+// Restore visible stock for items that came from eBay but are zero in DB while never being ordered.
+const restoreCountIfNoOrders = async (existing, payload) => {
+  if (!existing) return;
+
+  const incomingCount = payload.count ?? 0;
+  const existingCount = existing.count ?? 0;
+
+  if (incomingCount !== 0) return;
+  if (existingCount > 1) return;
+
+  const ordersCount = await OrderProduct.count({ where: { productId: existing.id } });
+  if (ordersCount === 0) {
+    payload.count = 1;
+    console.log(
+      `[eBay] Restored count to 1 for product ${existing.id} (eBay item ${existing.ebayItemId || 'unknown'}) - no orders found.`
+    );
+  }
 };
 
 const buildProductPayload = (detail) => {
@@ -151,6 +170,8 @@ const syncProductFromDetail = async (detail) => {
     return;
   }
 
+  await restoreCountIfNoOrders(existing, payload);
+
   if (existing) {
     await existing.update(payload);
     console.log(`[eBay] Updated product for ${ebayItemId} (stock: ${payload.count}).`);
@@ -191,6 +212,12 @@ const maybeSyncItem = async (summary) => {
   }
 
   if (!needDetail && existing) {
+    const payload = { count: summaryStock ?? existing.count ?? 0 };
+    await restoreCountIfNoOrders(existing, payload);
+
+    if (payload.count !== existing.count) {
+      await existing.update({ count: payload.count });
+    }
     return;
   }
 
