@@ -44,6 +44,22 @@ class StripeWebhookController {
         }
     }
 
+    extractShippingAddressFromCheckoutSession(session) {
+        const address = session?.shipping_details?.address || session?.customer_details?.address;
+        if (!address) {
+            return null;
+        }
+
+        return {
+            country: address.country || null,
+            city: address.city || null,
+            zip_code: address.postal_code || null,
+            addressState: address.state || null,
+            address_line_1: address.line1 || null,
+            address_line_2: address.line2 || null,
+        };
+    }
+
     async handleWebhook(req, res) {
         const signature = req.headers['stripe-signature'];
         const payload = req.body;
@@ -148,14 +164,31 @@ class StripeWebhookController {
         const tax = fullSession.total_details?.amount_tax || 0;
         const total = fullSession.amount_total || 0;
 
+        const orderUpdates = {};
+
+        // Save shipping address from Stripe (delivery info should come from Stripe for UPS)
+        if (order.delivey_type === 'ups') {
+            const shippingUpdate = this.extractShippingAddressFromCheckoutSession(fullSession);
+            if (shippingUpdate) {
+                Object.assign(orderUpdates, shippingUpdate);
+            }
+        }
+
         // Update order state to confirmed if payment was successful immediately
         if (session.payment_status === 'paid') {
-            await order.update({
+            Object.assign(orderUpdates, {
                 state: 'confirmed',
                 stripePaymentIntentId: session.payment_intent,
                 tax: tax / 100, // Convert from cents to dollars
                 total: total / 100, // Convert from cents to dollars
             });
+        }
+
+        if (Object.keys(orderUpdates).length) {
+            await order.update(orderUpdates);
+        }
+
+        if (session.payment_status === 'paid') {
             console.log(`Order ${orderId} confirmed - payment completed. Tax: $${tax / 100}, Total: $${total / 100}`);
 
             // Clear user's cart after successful payment
@@ -243,10 +276,29 @@ class StripeWebhookController {
             return;
         }
 
-        await order.update({
+        // Retrieve full session details to get tax and shipping information
+        const fullSession = await getCheckoutSession(session.id);
+
+        // Extract tax and total information
+        const tax = fullSession.total_details?.amount_tax || 0;
+        const total = fullSession.amount_total || 0;
+
+        const orderUpdates = {
             state: 'confirmed',
-            stripePaymentIntentId: session.payment_intent
-        });
+            stripePaymentIntentId: session.payment_intent,
+            tax: tax / 100, // Convert from cents to dollars
+            total: total / 100, // Convert from cents to dollars
+        };
+
+        // Save shipping address from Stripe (delivery info should come from Stripe for UPS)
+        if (order.delivey_type === 'ups') {
+            const shippingUpdate = this.extractShippingAddressFromCheckoutSession(fullSession);
+            if (shippingUpdate) {
+                Object.assign(orderUpdates, shippingUpdate);
+            }
+        }
+
+        await order.update(orderUpdates);
         console.log(`Order ${orderId} confirmed - async payment succeeded`);
 
         // Clear user's cart after successful payment

@@ -25,13 +25,9 @@
 | Field                   | Type     | Description            | Example                   |
 | ----------------------- | -------- | ---------------------- | ------------------------- |
 | `delivey_type`          | `string` | Тип доставки           | `"ups"`, `"pickup"`, etc. |
-| `country`               | `string` | Страна доставки        | `"USA"`                   |
-| `city`                  | `string` | Город доставки         | `"New York"`              |
-| `zip_code`              | `string` | Почтовый индекс        | `"10001"`                 |
-| `state`                 | `string` | Штат/область           | `"NY"`                    |
-| `address_line_1`        | `string` | Адрес (строка 1)       | `"123 Main St"`           |
-| `address_line_2`        | `string` | Адрес (строка 2)       | `"Apt 4B"`                |
-| `delivery_instructions` | `string` | Инструкции по доставке | `"Leave at door"`         |
+
+> Важно: данные доставки (адрес и т.п.) **не передаются** при создании заказа.
+> Если `delivey_type === "ups"`, адрес доставки собирается на стороне **Stripe Checkout** и сохраняется в заказ через Stripe webhook.
 
 ### Products Array Structure
 
@@ -54,13 +50,6 @@
   "mail": "john@example.com",
   "phone": "+1234567890",
   "delivey_type": "ups",
-  "country": "USA",
-  "city": "New York",
-  "zip_code": "10001",
-  "state": "NY",
-  "address_line_1": "123 Main St",
-  "address_line_2": "Apt 4B",
-  "delivery_instructions": "Leave at door",
   "products": [
     {
       "productId": 42,
@@ -124,16 +113,6 @@
 
 **Причина:** Пользователь с указанным `userId` не найден в базе данных
 
-#### 500 - Missing Delivery Information
-
-```json
-{
-  "error": "Please, fill delivery form"
-}
-```
-
-**Причина:** Для доставки типа `"ups"` обязательны поля `zip_code`, `state` и `address_line_1`
-
 #### 400 - General Error
 
 ```json
@@ -152,14 +131,11 @@
    - `userId`, `fullName`, `phone`, `mail` - обязательны всегда
    - `products` должен быть непустым массивом
 
-2. **Delivery type validation:**
-   - Если `delivey_type === "ups"`, то обязательны: `zip_code`, `state`, `address_line_1`
-
-3. **Products validation:**
+2. **Products validation:**
    - Все товары с указанными `productId` должны существовать в базе данных
    - `count` должен быть положительным числом
 
-4. **User validation:**
+3. **User validation:**
    - Пользователь с `userId` должен существовать в базе данных
 
 ---
@@ -232,13 +208,6 @@ const orderData = {
   mail: 'john@example.com',
   phone: '+1234567890',
   delivey_type: 'ups',
-  country: 'USA',
-  city: 'New York',
-  zip_code: '10001',
-  state: 'NY',
-  address_line_1: '123 Main St',
-  address_line_2: 'Apt 4B',
-  delivery_instructions: 'Leave at door',
   products: [
     {
       productId: 42,

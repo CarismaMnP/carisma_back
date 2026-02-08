@@ -22,5 +22,6 @@ router.get('/orders', authMiddleware, usersController.orders)
 router.post('/plusCart', optionalAuthMiddleware, usersController.plusCart)
 router.post('/minusCart', optionalAuthMiddleware, usersController.minusCart)
 router.post('/part-request', usersController.submitPartRequest)
+router.post('/client-message', usersController.submitClientMessage)
 
 module.exports = router

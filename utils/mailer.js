@@ -10,6 +10,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Send verification code email for login
  * @param {string} email - Recipient email
@@ -260,9 +270,62 @@ async function sendClientRequest({ make, model, generation, email, partDescripti
   }
 }
 
+/**
+ * Send client message email to business
+ * @param {Object} params - Message parameters
+ * @param {string} params.name - Client name
+ * @param {string} params.mail - Client email
+ * @param {string} params.message - Client message
+ */
+async function sendClientMessage({ name, mail, message }) {
+  const safeName = escapeHtml(name) || 'Not specified';
+  const safeMail = escapeHtml(mail) || 'Not specified';
+  const safeMessage = (escapeHtml(message) || 'Not specified').replace(/\r?\n/g, '<br>');
+  const mailHref = mail ? `mailto:${encodeURIComponent(mail)}` : '';
+
+  const mailOptions = {
+    from: '"CARisma M&P Website" <info@mailer.carismamp.com>',
+    to: 'info@carismamp.com',
+    subject: 'New Client Message',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">New Client Message</h2>
+        <p>A visitor sent a message via the website:</p>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr>
+            <td style="padding: 10px; border: 1px solid #ddd; background-color: #f9f9f9; font-weight: bold; width: 30%;">Name</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${safeName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #ddd; background-color: #f9f9f9; font-weight: bold;">Email</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${mailHref ? `<a href="${mailHref}">${safeMail}</a>` : safeMail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #ddd; background-color: #f9f9f9; font-weight: bold;">Message</td>
+            <td style="padding: 10px; border: 1px solid #ddd;">${safeMessage}</td>
+          </tr>
+        </table>
+
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="color: #888; font-size: 12px;">This message was submitted via the CARisma M&P website.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Client message sent from ${mail}`);
+  } catch (error) {
+    console.error('Error sending client message email:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   sendVerificationCode,
   sendOrderConfirmation,
   sendClientRequest,
+  sendClientMessage,
   sendOrderNotification
 };

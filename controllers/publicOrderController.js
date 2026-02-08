@@ -8,8 +8,7 @@ class OrderController {
             const {
                 userId, products,
                 fullName, mail, phone,
-                delivey_type, country, city, zip_code, state: addressState, address_line_1, address_line_2,
-                delivery_instructions
+                delivey_type
             } = req.body;
 
             if (!userId || !fullName || !phone || !mail || !products?.length){
@@ -20,9 +19,6 @@ class OrderController {
             
             if (!user){
                 return res.status(500).json({ error: 'User not found. Please authorize' });
-            }
-            if (delivey_type === "ups" && (!zip_code || !addressState || !address_line_1)){
-                return res.status(500).json({ error: 'Please, fill delivery form' });
             }
 
             const dbProds = await Product.findAll({ where: { id: {[Op.in]: products.map(p=>p.productId)} } });
@@ -62,29 +58,11 @@ class OrderController {
                 mail,
                 phone,
                 delivey_type,
-                country,
-                city,
-                zip_code,
-                addressState: addressState,
-                address_line_1,
-                address_line_2,
-                delivery_instructions
             });
 
             await OrderProduct.bulkCreate(
                 products.map(p=>({ orderId: order.id, productId: p.productId, count: p.count, selectorValue: p.selectorValue }))
             );
-
-            // Prepare shipping address for tax calculation
-            const shippingAddress = delivey_type === 'ups' && address_line_1 ? {
-                name: fullName,
-                line1: address_line_1,
-                line2: address_line_2 || undefined,
-                city: city,
-                state: addressState,
-                postal_code: zip_code,
-                country: country || 'US',
-            } : null;
 
             // Create Stripe checkout session
             const stripeSession = await createCheckoutSession({
@@ -92,7 +70,7 @@ class OrderController {
                 amount: sum,
                 customerEmail: mail,
                 lineItems: lineItems,
-                shippingAddress: shippingAddress,
+                collectShippingAddress: delivey_type === 'ups',
             });
 
             // Update order with Stripe payment intent ID

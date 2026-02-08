@@ -34,10 +34,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * @param {number} params.amount - Amount in USD
  * @param {string} params.customerEmail - Customer email
  * @param {Array} params.lineItems - Array of line items
- * @param {Object} params.shippingAddress - Shipping address for tax calculation
+ * @param {boolean} params.collectShippingAddress - Whether Stripe Checkout should collect shipping address
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, shippingAddress }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress }) {
   try {
     const sessionConfig = {
       payment_method_types: ['card'],
@@ -60,27 +60,25 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       },
     };
 
-    // Add shipping address if provided (required for tax calculation)
-    if (shippingAddress) {
+    // Collect shipping address in Stripe Checkout (required for tax calculation on shipped orders)
+    if (collectShippingAddress) {
       sessionConfig.shipping_address_collection = {
         allowed_countries: ['US'], // Можно добавить другие страны
       };
 
-      // Pre-fill shipping details if available
-      if (shippingAddress.name && shippingAddress.line1 && shippingAddress.city && shippingAddress.state && shippingAddress.postal_code && shippingAddress.country) {
-        sessionConfig.shipping_options = [
-          {
-            shipping_rate_data: {
-              type: 'fixed_amount',
-              fixed_amount: {
-                amount: 0, // Укажите стоимость доставки в центах
-                currency: 'usd',
-              },
-              display_name: 'Standard Shipping',
+      // Basic shipping option (0$ by default). Adjust if you need real UPS rates.
+      sessionConfig.shipping_options = [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: 0, // Укажите стоимость доставки в центах
+              currency: 'usd',
             },
+            display_name: 'Standard Shipping',
           },
-        ];
-      }
+        },
+      ];
     }
 
     const session = await stripe.checkout.sessions.create(sessionConfig);

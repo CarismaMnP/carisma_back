@@ -4,7 +4,7 @@ const {User, Order, CartProduct, Product, Session} = require('../models/models')
 const axios = require("axios");
 const Op = require('sequelize').Op;
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
-const { sendVerificationCode, sendClientRequest } = require('../utils/mailer');
+const { sendVerificationCode, sendClientRequest, sendClientMessage } = require('../utils/mailer');
 
 const generateJwt = (id, name, mail, phone, role) => {
   return jwt.sign({id, name, mail, phone, role}, process.env.SECRET_KEY, {expiresIn: '72h'})
@@ -399,6 +399,35 @@ class UsersController {
     } catch (e) {
       console.error('Failed to submit part request:', e);
       return next(ApiError.internal('Failed to submit request. Please try again later.'));
+    }
+  }
+
+  async submitClientMessage(req, res, next) {
+    try {
+      const { name, mail, message } = req.body;
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return next(ApiError.badRequest('Please provide your name'));
+      }
+
+      if (!mail || typeof mail !== 'string' || !mail.includes('@')) {
+        return next(ApiError.badRequest('Please provide a valid email address'));
+      }
+
+      if (!message || typeof message !== 'string' || !message.trim()) {
+        return next(ApiError.badRequest('Please provide your message'));
+      }
+
+      await sendClientMessage({
+        name: name.trim(),
+        mail: mail.trim(),
+        message: message.trim(),
+      });
+
+      return res.json({ success: true, message: 'Message sent successfully' });
+    } catch (e) {
+      console.error('Failed to submit client message:', e);
+      return next(ApiError.internal('Failed to send message. Please try again later.'));
     }
   }
 }
