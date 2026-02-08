@@ -1,6 +1,6 @@
 const ApiError = require('../error/ApiError')
 const jwt = require('jsonwebtoken')
-const {User, CartProduct, Product} = require('../models/models')
+const {User, CartProduct, Product, Order} = require('../models/models')
 
 const generateJwt = (id, name, mail, role) => {
     return jwt.sign({id, name, mail, role}, process.env.SECRET_KEY,{expiresIn: '72h'})
@@ -41,7 +41,7 @@ class UsersController {
             let offset = page * limit - limit
             const users = await User.findAndCountAll({
                 limit, offset, order: [['name', 'ASC']], 
-                include: [{model: CartProduct, required: false, include: [{model: Product, required: false}]}]
+                include: [{model: CartProduct, required: false, include: [{model: Product, required: false}], model: Order}]
             })
 
             users.rows.forEach(user => {
@@ -53,6 +53,20 @@ class UsersController {
                     user.setDataValue('cartSum', cartSum)
                 } else {
                     user.setDataValue('cartSum', 0)
+                }
+            });
+            
+            users.rows.forEach(user => {
+                if(user.orders && user.orders.length > 0){
+                    let total = 0
+                    user.orders.forEach((order) => {
+                        if(!["pending", "expired"].includes(order.state)){
+                            total += order.sum
+                        }
+                    })
+                    user.setDataValue('total', total)
+                } else {
+                    user.setDataValue('total', 0)
                 }
             });
 

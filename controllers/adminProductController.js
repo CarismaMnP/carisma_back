@@ -27,7 +27,10 @@ class ProductController {
         order: [['createdAt', 'DESC']],
         include: [{model: Category}]
       })
-      return res.json(products)
+
+      const active = await Product.count({where: {...whereClause, count: {[Op.ne]: 0}}})
+
+      return res.json({active, ...products})
     } catch (e) {
       next(ApiError.badRequest(e.message))
     }
