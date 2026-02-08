@@ -41,7 +41,7 @@ class UsersController {
             let offset = page * limit - limit
             const users = await User.findAndCountAll({
                 limit, offset, order: [['name', 'ASC']], 
-                include: [{model: CartProduct, required: false, include: [{model: Product, required: false}], model: Order}]
+                include: [{model: CartProduct, required: false, include: [{model: Product, required: false}]}, {model: Order}]
             })
 
             users.rows.forEach(user => {
