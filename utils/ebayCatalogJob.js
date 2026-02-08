@@ -313,7 +313,7 @@ const runEbayCatalogPull = async () => {
   // наиболее покрывающие ключевые слова для вашего каталога.
 
   // Вариант 1: Используем несколько широких терминов (2-3 запроса вместо 15)
-  const queryTerms = ['OEM']
+  const queryTerms = ['OEM', '20']
 
   const dedupMap = new Map();
 
