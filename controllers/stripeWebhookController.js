@@ -45,10 +45,18 @@ class StripeWebhookController {
     }
 
     extractShippingAddressFromCheckoutSession(session) {
-        const address = session?.shipping_details?.address || session?.customer_details?.address;
+        // Stripe API (2025-03-31+) stores shipping details in collected_information.shipping_details.
+        // Keep backward compatibility with older versions where shipping_details is at the top level.
+        const shippingDetails = session?.collected_information?.shipping_details || session?.shipping_details || null;
+        const address = shippingDetails?.address || session?.customer_details?.address || null;
         if (!address) {
             return null;
         }
+
+        const deliveryInstructionsField = Array.isArray(session?.custom_fields)
+            ? session.custom_fields.find((field) => field?.key === 'delivery_instructions')
+            : null;
+        const deliveryInstructions = deliveryInstructionsField?.text?.value || null;
 
         return {
             country: address.country || null,
@@ -57,6 +65,7 @@ class StripeWebhookController {
             addressState: address.state || null,
             address_line_1: address.line1 || null,
             address_line_2: address.line2 || null,
+            ...(deliveryInstructions !== null ? { delivery_instructions: deliveryInstructions } : {}),
         };
     }
 

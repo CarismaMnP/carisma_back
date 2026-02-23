@@ -1,6 +1,5 @@
 const ApiError = require('../error/ApiError')
 const {s3} = require('../db');
-const sharp = require('sharp');
 const {Category, Product} = require('../models/models');
 const { v4 } = require('uuid');
 const { Op } = require('sequelize');
@@ -178,9 +177,8 @@ class ProductController {
       }
 
       let selectorJSON = ""
-      console.log(selector)
       if (selector) {
-        selectorJSON = JSON.parse(selector) || ''
+        selectorJSON = JSON.parse(selector)
       }
 
       let filesPromises = []
@@ -188,19 +186,10 @@ class ProductController {
       if (files && files.length > 0) {
         filesPromises = files.map(async (file) => {
           if (file) {
-            // 袟邪谐褉褍蟹泻邪 芯褉懈谐懈薪邪谢褜薪芯谐芯 懈蟹芯斜褉邪卸械薪懈褟
             const upload = await s3.Upload({buffer: file.data}, '/products/');
-            const imageUrl = upload.Key;
+            const imageUrl = `https://pub-bc3786b523da4133a78648b83b419424.r2.dev/${upload.Key}`;
 
-            const previewBuffer = await sharp(file.data)
-              .resize(24, 24)
-              .toBuffer();
-
-            // 袟邪谐褉褍蟹泻邪 屑懈薪懈邪褌褞褉褘 薪邪 S3
-            const previewUpload = await s3.Upload({buffer: previewBuffer}, '/products/previews/');
-            const previewUrl = previewUpload.Key;
-
-            return {imageUrl, previewUrl}
+            return imageUrl
           }
           return null;
         });
