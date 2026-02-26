@@ -173,6 +173,28 @@ const Session = sequelize.define('session', {
   userId: { type: DataTypes.INTEGER, unique: false, allowNull: true }
 });
 
+const PartRequest = sequelize.define('partRequest', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  make: { type: DataTypes.STRING, allowNull: true, defaultValue: '' },
+  model: { type: DataTypes.STRING, allowNull: true, defaultValue: '' },
+  generation: { type: DataTypes.STRING, allowNull: true, defaultValue: '' },
+  email: { type: DataTypes.STRING, allowNull: false },
+  partDescription: { type: DataTypes.TEXT, allowNull: true, defaultValue: '' },
+  isUnread: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+}, {
+  tableName: 'part_requests',
+});
+
+const ClientMessageRequest = sequelize.define('clientMessageRequest', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  mail: { type: DataTypes.STRING, allowNull: false },
+  message: { type: DataTypes.TEXT, allowNull: false },
+  isUnread: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+}, {
+  tableName: 'client_message_requests',
+});
+
 Product.belongsTo(Category)
 Category.hasMany(Product);
 
@@ -214,5 +236,7 @@ module.exports = {
   Session,
   BlockData,
   Promotion,
-  Arrival
+  Arrival,
+  PartRequest,
+  ClientMessageRequest
 };

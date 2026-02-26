@@ -10,6 +10,7 @@ const orderRouter = require('./orderRouter');
 const arrivalRouter = require('./arrivalRouter');
 const recipeRouter = require('./recipeRouter');
 const promotionRouter = require('./promotionRouter');
+const requestRouter = require('./requestRouter');
 
 router.use('/user', usersRouter);
 router.use('/category', checkRole('ADMINISTRATOR'), categoryRouter);
@@ -19,6 +20,6 @@ router.use('/product', checkRole('ADMINISTRATOR'), productRouter);
 router.use('/order', checkRole('ADMINISTRATOR'), orderRouter);
 router.use('/recipe', checkRole('ADMINISTRATOR'), recipeRouter);
 router.use('/promotion', checkRole('ADMINISTRATOR'), promotionRouter);
+router.use('/request', checkRole('ADMINISTRATOR'), requestRouter);
 
 module.exports = router
-

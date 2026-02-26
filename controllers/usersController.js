@@ -1,6 +1,6 @@
 const ApiError = require('../error/ApiError')
 const jwt = require('jsonwebtoken')
-const {User, Order, CartProduct, Product, Session} = require('../models/models')
+const {User, Order, CartProduct, Product, Session, PartRequest, ClientMessageRequest} = require('../models/models')
 const axios = require("axios");
 const Op = require('sequelize').Op;
 const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance();
@@ -387,18 +387,35 @@ class UsersController {
         return next(ApiError.badRequest('Please provide a valid email address'));
       }
 
-      await sendClientRequest({
-        make,
-        model,
-        generation,
-        email,
-        partDescription,
+      const partRequest = await PartRequest.create({
+        make: typeof make === 'string' ? make.trim() : '',
+        model: typeof model === 'string' ? model.trim() : '',
+        generation: typeof generation === 'string' ? generation.trim() : '',
+        email: email.trim(),
+        partDescription: typeof partDescription === 'string' ? partDescription.trim() : '',
       });
 
-      return res.json({ success: true, message: 'Request submitted successfully' });
+      try {
+        await sendClientRequest({
+          make: partRequest.make,
+          model: partRequest.model,
+          generation: partRequest.generation,
+          email: partRequest.email,
+          partDescription: partRequest.partDescription,
+        });
+      } catch (mailError) {
+        console.error('Failed to send part request email notification:', mailError);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Request submitted successfully',
+        id: partRequest.id,
+        isUnread: partRequest.isUnread,
+      });
     } catch (e) {
       console.error('Failed to submit part request:', e);
-      return next(ApiError.internal('Failed to submit request. Please try again later.'));
+      return next(ApiError.internal('Failed to save request. Please try again later.'));
     }
   }
 
@@ -418,16 +435,31 @@ class UsersController {
         return next(ApiError.badRequest('Please provide your message'));
       }
 
-      await sendClientMessage({
+      const clientMessageRequest = await ClientMessageRequest.create({
         name: name.trim(),
         mail: mail.trim(),
         message: message.trim(),
       });
 
-      return res.json({ success: true, message: 'Message sent successfully' });
+      try {
+        await sendClientMessage({
+          name: clientMessageRequest.name,
+          mail: clientMessageRequest.mail,
+          message: clientMessageRequest.message,
+        });
+      } catch (mailError) {
+        console.error('Failed to send client message email notification:', mailError);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Message sent successfully',
+        id: clientMessageRequest.id,
+        isUnread: clientMessageRequest.isUnread,
+      });
     } catch (e) {
       console.error('Failed to submit client message:', e);
-      return next(ApiError.internal('Failed to send message. Please try again later.'));
+      return next(ApiError.internal('Failed to save message. Please try again later.'));
     }
   }
 }
