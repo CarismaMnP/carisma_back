@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.893.0",
+    "adm-zip": "^0.5.17",
     "axios": "^1.7.2",
     "bcrypt": "^5.1.0",
     "cloudpayments": "^6.0.1",

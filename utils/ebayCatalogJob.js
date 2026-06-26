@@ -1,15 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 const cron = require('node-cron');
+const { Op } = require('sequelize');
 const { Product, OrderProduct } = require('../models/models');
-const { fetchStoreCatalog, fetchItemDetail, fetchCompatibilityList, storeName, sellerId } = require('./ebayClient');
+const {
+  fetchActiveInventoryReport,
+  fetchItemDetail,
+  fetchCompatibilityList,
+  storeName,
+  sellerId,
+} = require('./ebayClient');
 const { extractCpcmVehicleData } = require('./extractDescription');
 
-const pageSize = Number(process.env.EBAY_CATALOG_LIMIT || 50);
-// УДАЛЕНО: querySeeds больше не используется - теперь делаем один запрос вместо множества
 const compatibilityEnabled = String(process.env.EBAY_COMPATIBILITY_ENABLED || 'true').toLowerCase() === 'true';
+const markMissingAsSold = String(process.env.EBAY_MARK_MISSING_AS_SOLD || 'false').toLowerCase() === 'true';
 
 let sampleDetailSaved = false;
+let ebaySyncRunning = false;
 
 const slugify = (text) => {
   return (text || '')
@@ -158,19 +165,29 @@ const saveSamples = async (detail) => {
   }
 };
 
-const syncProductFromDetail = async (detail) => {
+const syncProductFromDetail = async (detail, overrides = {}) => {
   const ebayItemId = detail.itemId;
   if (!ebayItemId) return;
 
   const payload = buildProductPayload(detail);
-  const existing = await Product.findOne({ where: { ebayItemId } });
+  if (overrides.stock !== undefined && overrides.stock !== null) {
+    payload.count = overrides.stock;
+    payload.ebayStock = overrides.stock;
+  }
+  if (overrides.price !== undefined && overrides.price !== null && overrides.price > 0) {
+    payload.price = overrides.price;
+    payload.old_price = overrides.price;
+  }
+  if (overrides.legacyItemId && !payload.ebayLegacyId) {
+    payload.ebayLegacyId = overrides.legacyItemId;
+  }
+
+  const existing = await findExistingProduct(ebayItemId, payload.ebayLegacyId);
 
   if (existing && existing.isManual) {
     console.log(`[eBay] Skip manual product for ${ebayItemId}, leaving untouched.`);
     return;
   }
-
-  await restoreCountIfNoOrders(existing, payload);
 
   if (existing) {
     await existing.update(payload);
@@ -183,47 +200,63 @@ const syncProductFromDetail = async (detail) => {
   // await saveSamples(detail);
 };
 
+const findExistingProduct = async (ebayItemId, legacyItemId) => {
+  const or = [];
+  if (ebayItemId) {
+    or.push({ ebayItemId });
+  }
+  if (legacyItemId) {
+    or.push({ ebayLegacyId: legacyItemId });
+  }
+
+  if (!or.length) {
+    return null;
+  }
+
+  return Product.findOne({ where: { [Op.or]: or } });
+};
+
 const maybeSyncItem = async (summary) => {
   const ebayItemId = summary.itemId;
   if (!ebayItemId) return;
 
   const summaryStock = getStockFromAny(summary);
-  const existing = await Product.findOne({ where: { ebayItemId } });
+  const existing = await findExistingProduct(ebayItemId, summary.legacyItemId);
 
   if (existing && existing.isManual) {
     return;
   }
 
-  let needDetail = !existing;
-  if (!needDetail && summaryStock === null) {
-    // Если в summary нет стока, но в БД уже есть товар, оставляем как есть
-    // (будем обновлять только когда приходит сток в summary или товара еще нет)
-    if (existing.ebayStock == null && existing.count == null) {
-      needDetail = true;
-    } else {
-      needDetail = false;
-    }
-  }
-  if (!needDetail && summaryStock !== null) {
-    const currentStock = existing.ebayStock ?? existing.count ?? 0;
-    if (summaryStock !== currentStock) {
-      needDetail = true;
-    }
-  }
+  if (existing) {
+    const nextStock = summaryStock ?? existing.count ?? 0;
+    const updates = {
+      ebayItemId,
+      ebayLegacyId: summary.legacyItemId || existing.ebayLegacyId,
+      ebayStock: nextStock,
+      count: nextStock,
+    };
 
-  if (!needDetail && existing) {
-    const payload = { count: summaryStock ?? existing.count ?? 0 };
-    await restoreCountIfNoOrders(existing, payload);
-
-    if (payload.count !== existing.count) {
-      await existing.update({ count: payload.count });
+    if (summary.price !== undefined && summary.price !== null && summary.price > 0) {
+      updates.price = summary.price;
+      updates.old_price = summary.price;
     }
+
+    const changed = Object.entries(updates).some(([key, value]) => existing[key] !== value);
+
+    if (changed) {
+      await existing.update(updates);
+    }
+
     return;
   }
 
   try {
     const detail = await fetchItemDetail(ebayItemId);
-    await syncProductFromDetail(detail);
+    await syncProductFromDetail(detail, {
+      stock: summaryStock,
+      price: summary.price,
+      legacyItemId: summary.legacyItemId,
+    });
   } catch (err) {
     const details = err?.response?.data || err?.message || err;
     console.error(`[eBay] Failed to sync item ${ebayItemId}:`, details);
@@ -236,30 +269,50 @@ const maybeSyncItem = async (summary) => {
  */
 const markMissingProductsAsSold = async (syncedItems) => {
   try {
-    // Get all eBay item IDs from current sync
-    const syncedEbayItemIds = syncedItems.map(item => item.itemId).filter(Boolean);
+    const syncedEbayItemIds = new Set(syncedItems.map((item) => item.itemId).filter(Boolean));
+    const syncedLegacyItemIds = new Set(syncedItems.map((item) => item.legacyItemId).filter(Boolean));
 
     // Find all eBay products in DB (isManual = false, count > 0)
     const allEbayProducts = await Product.findAll({
       where: {
         isManual: false,
-        count: { [require('sequelize').Op.gt]: 0 }
+        count: { [Op.gt]: 0 }
       },
-      attributes: ['id', 'ebayItemId', 'name', 'count']
+      attributes: ['id', 'ebayItemId', 'ebayLegacyId', 'name', 'count']
     });
 
     let markedCount = 0;
+    const minimumSyncedItems = Number(process.env.EBAY_MIN_SYNCED_ITEMS_FOR_MARK_MISSING || 1000);
+    const minimumRatio = Number(process.env.EBAY_MIN_SYNC_RATIO_FOR_MARK_MISSING || 0.5);
+
+    if (syncedItems.length < minimumSyncedItems) {
+      console.log(
+        `[eBay] Skipping mark-missing: only ${syncedItems.length} synced items, minimum is ${minimumSyncedItems}.`
+      );
+      return;
+    }
+
+    if (syncedItems.length < allEbayProducts.length * minimumRatio) {
+      console.log(
+        `[eBay] Skipping mark-missing: ${syncedItems.length} synced items is below ${minimumRatio} of ${allEbayProducts.length} active DB items.`
+      );
+      return;
+    }
 
     // Check each eBay product in DB
     for (const product of allEbayProducts) {
-      if (!product.ebayItemId) {
-        console.log(`[eBay] Product ${product.id} has isManual=false but no ebayItemId, skipping.`);
+      if (!product.ebayItemId && !product.ebayLegacyId) {
+        console.log(`[eBay] Product ${product.id} has isManual=false but no eBay id, skipping.`);
         continue;
       }
 
       // If product's ebayItemId is NOT in the synced list, it was sold on eBay
-      if (!syncedEbayItemIds.includes(product.ebayItemId)) {
-        await product.update({ count: 0 });
+      const existsInSync =
+        (product.ebayItemId && syncedEbayItemIds.has(product.ebayItemId)) ||
+        (product.ebayLegacyId && syncedLegacyItemIds.has(product.ebayLegacyId));
+
+      if (!existsInSync) {
+        await product.update({ count: 0, ebayStock: 0 });
         console.log(`[eBay] Product ${product.id} (${product.name}) - eBay item ${product.ebayItemId} not found in sync, set count to 0 (sold on eBay)`);
         markedCount++;
       }
@@ -275,66 +328,43 @@ const markMissingProductsAsSold = async (syncedItems) => {
   }
 };
 
-const fetchAllForQuery = async (query) => {
-  let offset = 0;
-  const collected = [];
-  const limit = pageSize;
-
-  while (true) {
-    const { items, total } = await fetchStoreCatalog({ limit, offset, query });
-
-    if (!items.length) {
-      break;
-    }
-
-    collected.push(...items);
-
-    // Логируем прогресс
-    console.log(`[eBay] Fetched ${collected.length}/${total || '?'} items (offset: ${offset})...`);
-
-    if (items.length < limit) {
-      break;
-    }
-
-    offset += limit;
-  }
-
-  return collected;
-};
-
 const runEbayCatalogPull = async () => {
-  console.log(
-    `[eBay] Fetching catalog for store "${storeName}" (seller ${sellerId})...`
-  );
-
-  // ОПТИМИЗАЦИЯ: Используем минимальный набор широких запросов
-  // вместо 15 seeds. Для автозапчастей используем общие термины.
-  // eBay API требует обязательный query параметр, поэтому используем
-  // наиболее покрывающие ключевые слова для вашего каталога.
-
-  // Вариант 1: Используем несколько широких терминов (2-3 запроса вместо 15)
-  const queryTerms = ['OEM', '20']
-
-  const dedupMap = new Map();
-
-  for (const term of queryTerms) {
-    console.log(`[eBay] Fetching items for query "${term}"...`);
-    const items = await fetchAllForQuery(term);
-    console.log(`[eBay] Query "${term}" returned ${items.length} items.`);
-    items.forEach((item) => dedupMap.set(item.itemId, item));
+  if (ebaySyncRunning) {
+    console.log('[eBay] Sync already running, skipping this pass.');
+    return;
   }
 
-  const uniqueItems = Array.from(dedupMap.values());
-  console.log(`[eBay] Total unique items collected: ${uniqueItems.length}.`);
+  ebaySyncRunning = true;
 
-  for (const item of uniqueItems) {
-    await maybeSyncItem(item);
+  try {
+    console.log(
+      `[eBay] Fetching active inventory report for store "${storeName}" (seller ${sellerId})...`
+    );
+
+    const reportItems = await fetchActiveInventoryReport();
+    const dedupMap = new Map();
+    reportItems.forEach((item) => dedupMap.set(item.itemId, item));
+
+    const uniqueItems = Array.from(dedupMap.values());
+    console.log(`[eBay] Total unique active inventory items collected: ${uniqueItems.length}.`);
+
+    for (let i = 0; i < uniqueItems.length; i++) {
+      await maybeSyncItem(uniqueItems[i]);
+      if ((i + 1) % 250 === 0 || i + 1 === uniqueItems.length) {
+        console.log(`[eBay] Synced ${i + 1}/${uniqueItems.length} active inventory items.`);
+      }
+    }
+
+    if (markMissingAsSold) {
+      await markMissingProductsAsSold(uniqueItems);
+    } else {
+      console.log('[eBay] Skipping markMissingProductsAsSold; EBAY_MARK_MISSING_AS_SOLD is not true.');
+    }
+
+    console.log('[eBay] Sync pass completed.');
+  } finally {
+    ebaySyncRunning = false;
   }
-
-  // Mark products as sold (count = 0) if they didn't appear in eBay sync
-  await markMissingProductsAsSold(uniqueItems);
-
-  console.log('[eBay] Sync pass completed.');
 };
 
 const scheduleEbayCatalogJob = () => {
