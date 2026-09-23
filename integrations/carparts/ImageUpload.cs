@@ -20,7 +20,9 @@ public static class CarismaImageUpload {
    Parallel.For(0,inputs.Length,new ParallelOptions{MaxDegreeOfParallelism=16}, i=>{
     var item=inputs[i];var result=new CarismaImageResult{id=item.id};results[i]=result;
     try {
-     using(var original=Image.FromFile(item.path)) {
+     // Release the source file before encoding and network I/O so staff can edit it.
+     using(var input=new MemoryStream(File.ReadAllBytes(item.path)))
+     using(var original=Image.FromStream(input)) {
       if(Array.IndexOf(original.PropertyIdList,274)>=0) {
        int orientation=original.GetPropertyItem(274).Value[0];
        RotateFlipType[] transforms={RotateFlipType.RotateNoneFlipNone,RotateFlipType.RotateNoneFlipNone,RotateFlipType.RotateNoneFlipX,RotateFlipType.Rotate180FlipNone,RotateFlipType.Rotate180FlipX,RotateFlipType.Rotate90FlipX,RotateFlipType.Rotate90FlipNone,RotateFlipType.Rotate270FlipX,RotateFlipType.Rotate270FlipNone};
