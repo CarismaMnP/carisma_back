@@ -311,6 +311,15 @@ suite('CarParts transactional integration', () => {
     expect(gone.carpartsGuid).toBe(guid);
     expect((await unknown.reload()).count).toBe(1);
   });
+  test.each(['legacy','private'])('a public direct link cannot expose %s inventory', async kind => {
+    const product = await models.Product.create({name:'Hidden stock',link:'hidden-stock',source:kind==='legacy'?'legacy':'carparts',carpartsData:{reason:kind},isManual:false,count:0,price:25,images:[]});
+    const response = {status:jest.fn().mockReturnThis(),json:jest.fn()};
+    const next = jest.fn();
+    await require('../../controllers/clientProductController').getProduct({query:{link:product.link},params:{}},response,next);
+    expect(response.status).toHaveBeenCalledWith(404);
+    expect(response.json).toHaveBeenCalledWith({message:'Product not found'});
+    expect(next).not.toHaveBeenCalled();
+  });
   test('an archived imported alias cannot be reactivated by editing its quantity', async () => {
     const product = await models.Product.create({name:'Archived alias',link:'archived-alias',source:'legacy',isManual:false,count:0,price:25,images:[]});
     const response = {status:jest.fn().mockReturnThis(),json:jest.fn()};

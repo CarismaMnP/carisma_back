@@ -155,8 +155,9 @@ class ProductController {
         ],
       });
 
-      if (!product) {
-        return next(ApiError.badRequest('Product not found'));
+      if (!product || product.source === 'legacy' ||
+          (product.source === 'carparts' && product.carpartsData?.reason === 'private')) {
+        return res.status(404).json({message: 'Product not found'});
       }
 
       return res.json(product);
