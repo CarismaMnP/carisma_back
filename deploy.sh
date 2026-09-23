@@ -2,11 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 NODE_ENV=production npx sequelize-cli db:migrate --env production
-# Replace the old npm/watch launcher and stop a one-time bootstrap worker.
-for app in carisma_backend carisma_carparts carisma_carparts_bootstrap; do
-  if pm2 describe "$app" >/dev/null 2>&1; then pm2 delete "$app"; fi
-done
-pm2 start ecosystem.config.cjs
+# Keep the API serving while the photo worker drains in-flight batches.
+if pm2 describe carisma_carparts_bootstrap >/dev/null 2>&1; then
+  pm2 delete carisma_carparts_bootstrap
+fi
+pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 for attempt in {1..20}; do
   if curl -fsS 'http://127.0.0.1:5050/api/public/product?limit=1' >/dev/null; then exit 0; fi

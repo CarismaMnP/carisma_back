@@ -63,7 +63,7 @@ async function processSales() {
           await job.update({
             state: 'review',
             result,
-            lastError: `Checkmate requires review: ${result.state}`,
+            lastError: `Checkmate requires review: ${result.error || result.state}`,
           });
       } catch (e) {
         await job.update({

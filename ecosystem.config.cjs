@@ -17,7 +17,7 @@ module.exports = {
       watch: false,
       env: { NODE_ENV: 'production' },
       max_memory_restart: '1400M',
-      kill_timeout: 30000,
+      kill_timeout: 210000,
       restart_delay: 5000,
     },
   ],

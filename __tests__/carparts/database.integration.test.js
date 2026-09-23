@@ -58,7 +58,7 @@ suite('CarParts transactional integration', () => {
     await sequelize.query(
       'TRUNCATE carparts_jobs, "cartProducts", "orderProducts", orders, products, carparts_images, carparts_sync_states RESTART IDENTITY CASCADE',
     );
-    require('../../integrations/carparts/transport').bridge.mockImplementation(async request => {
+    require('../../integrations/carparts/transport').bridge.mockReset().mockImplementation(async request => {
       if (request.action !== 'stock') throw Error('Live bridge forbidden in tests');
       return { ok: true, items: request.guids.map(g => row(g)) };
     });
@@ -175,12 +175,24 @@ suite('CarParts transactional integration', () => {
   test('a disconnected source cannot reserve stock or create an order', async () => {
     await catalog.syncCatalog({ snapshot: snapshot([row()]) });
     const p = await models.Product.findOne({ where: { carpartsGuid: guid } });
-    require('../../integrations/carparts/transport').bridge.mockRejectedValueOnce(
+    require('../../integrations/carparts/transport').bridge.mockRejectedValue(
       Error('Source offline'),
     );
-    await expect(reserve(p.id)).rejects.toThrow('Source offline');
+    await expect(reserve(p.id)).rejects.toThrow('Inventory connection is temporarily unavailable');
     expect(await models.Order.count()).toBe(0);
     expect((await p.reload()).count).toBe(1);
+  });
+  test('a brief read-only connection failure recovers before reserving stock once', async () => {
+    await catalog.syncCatalog({ snapshot: snapshot([row()]) });
+    const p = await models.Product.findOne({ where: { carpartsGuid: guid } });
+    const bridge = require('../../integrations/carparts/transport').bridge;
+    bridge.mockClear();
+    bridge.mockRejectedValueOnce(Error('Temporary SSH connection failure'));
+    await reserve(p.id);
+    expect(bridge).toHaveBeenCalledTimes(2);
+    expect(await models.Order.count()).toBe(1);
+    expect((await p.reload()).count).toBe(0);
+    expect(await models.CarpartsJob.count()).toBe(0);
   });
   test('a transient native timeout is retried for the same paid order only', async () => {
     await catalog.syncCatalog({ snapshot: snapshot([row()]) });

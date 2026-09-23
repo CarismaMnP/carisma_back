@@ -32,10 +32,21 @@ async function reserveOrder(data) {
   });
   let checkedAt = Date.now();
   if (sourced.length) {
-    const response = await bridge(
-      { action: 'stock', guids: sourced.map(p => p.carpartsGuid) },
-      { timeout: 25000 },
-    );
+    let response;
+    // Only the read-only availability check is retried here. Native writes
+    // are reconciled by the durable outbox with an order-specific audit.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await bridge(
+          { action: 'stock', guids: sourced.map(p => p.carpartsGuid) },
+          { timeout: 11000 },
+        );
+        break;
+      } catch (error) {
+        if (attempt === 1)
+          throw Error('Inventory connection is temporarily unavailable. Please try again shortly.');
+      }
+    }
     if (!response.ok || !Array.isArray(response.items))
       throw Error('Inventory connection is temporarily unavailable');
     for (const p of sourced) {

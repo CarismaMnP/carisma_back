@@ -2,8 +2,9 @@ param($Request,[switch]$AuditOnly)
 # A paid website order removes one physical part through the native Workstation procedure.
 # Never use SQL DELETE/UPDATE against Checkmate or perform a separate marketplace delist.
 $ErrorActionPreference='Stop'
+function Review([string]$message){[pscustomobject]@{ok=$false;state='review_required';writeCalled=$false;error=$message}|ConvertTo-Json -Compress}
 $guid=[string]$Request.guid;$orderId=[string]$Request.orderId
-if($guid -notmatch '^[0-9A-F]{8}-(?:[0-9A-F]{4}-){3}[0-9A-F]{12}$' -or $orderId -notmatch '^[0-9a-fA-F-]{36}$'){throw 'Invalid identity'}
+if($guid -notmatch '^[0-9A-F]{8}-(?:[0-9A-F]{4}-){3}[0-9A-F]{12}$' -or $orderId -notmatch '^[0-9a-fA-F-]{36}$'){Review 'Invalid identity';return}
 $reason='WEB '+$orderId
 $c=New-Object System.Data.Odbc.OdbcConnection('DSN=Checkmate')
 function Read-Q([string]$sql,[object[]]$values=@()){
@@ -19,17 +20,17 @@ try{
   $audit=@(Read-Q 'SELECT Comment FROM SQLUser.InvRemoval WHERE GUID=? AND Comment=?' @($guid,$reason))
   [pscustomobject]@{ok=($audit.Count -gt 0);state=$(if($audit.Count -gt 0){'already_removed'}else{'absent_without_order_audit'});writeCalled=$false}|ConvertTo-Json -Compress;return
  }
- if($rows.Count -ne 1){throw 'Ambiguous inventory GUID'};$t=$rows[0]
- if($t.InventoryID -ne $Request.inventoryId -or $t.Tag -ne $Request.tag -or $t.Yard -ne 9032 -or $t.Part -eq 'AUT'){throw 'Inventory identity mismatch'}
+ if($rows.Count -ne 1){Review 'Ambiguous inventory GUID';return};$t=$rows[0]
+ if($t.InventoryID -ne $Request.inventoryId -or $t.Tag -ne $Request.tag -or $t.Yard -ne 9032 -or $t.Part -eq 'AUT'){Review 'Inventory identity mismatch';return}
  if(([string]$t.Status).Trim() -ne '' -or $t.Available -ine 'Yes' -or $t.Private -ieq 'Yes' -or $t.WONum -or $t.HoldName){
   [pscustomobject]@{ok=$false;state='unavailable';writeCalled=$false}|ConvertTo-Json -Compress;return
  }
- if($t.AssemblyParentGUID -and $t.AssemblyParentGUID -ne 'X'){throw 'Assembly part requires review'}
- if(@(Read-Q 'SELECT GUID FROM SQLUser.Inventory WHERE AssemblyParentGUID=?' @($guid)).Count){throw 'Part has assembly children'}
+ if($t.AssemblyParentGUID -and $t.AssemblyParentGUID -ne 'X'){Review 'Assembly part requires review';return}
+ if(@(Read-Q 'SELECT GUID FROM SQLUser.Inventory WHERE AssemblyParentGUID=?' @($guid)).Count){Review 'Part has assembly children';return}
  $settings=@(Read-Q 'SELECT HomeYard,SalesAutoRemoveDelParts FROM SQLUser.YardSettings')
- if($settings.Count -ne 1 -or $settings[0].HomeYard -ne 9032 -or $settings[0].SalesAutoRemoveDelParts -ne 'Y'){throw 'Native deletion configuration changed'}
+ if($settings.Count -ne 1 -or $settings[0].HomeYard -ne 9032 -or $settings[0].SalesAutoRemoveDelParts -ne 'Y'){Review 'Native deletion configuration changed';return}
  $user=@(Read-Q "SELECT EmpName,EmpPrivileges,YardNumber FROM SQLUser.UserFeatures WHERE EmpNum='100'")
- if($user.Count -ne 1 -or $user[0].EmpName -ne 'SERGEI' -or $user[0].YardNumber -ne 9032 -or $user[0].EmpPrivileges -notmatch ',1,'){throw 'Native application user changed'}
+ if($user.Count -ne 1 -or $user[0].EmpName -ne 'SERGEI' -or $user[0].YardNumber -ne 9032 -or $user[0].EmpPrivileges -notmatch ',1,'){Review 'Native application user changed';return}
  if($AuditOnly){[pscustomobject]@{ok=$true;state='audit_only';writeCalled=$false;guid=$guid}|ConvertTo-Json -Compress;return}
  $config=Get-Content -Raw -LiteralPath "$PSScriptRoot\config.json"|ConvertFrom-Json
  if($config.enableSales -ne $true -or $Request.paidLive -ne $true -or !$config.salesAfter -or [datetime]$Request.paidAt -lt [datetime]$config.salesAfter){throw 'Live sales are not enabled for this order'}

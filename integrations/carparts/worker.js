@@ -48,12 +48,18 @@ function loop(name, delay, fn) {
   loop('catalog', Number(process.env.CARPARTS_SYNC_INTERVAL_MS) || 300000, () =>
     syncCatalog({ stageOnly: process.env.CARPARTS_STAGE_ONLY === 'true' }),
   );
-  // Stagger initial SSH handshakes to keep checkout probes responsive.
-  for (let shard = 0; shard < 8; shard++) {
+  // Bound background SSH sessions so live checkout probes retain capacity.
+  const lanes = Math.max(1, Math.min(8, Math.floor(Number(process.env.CARPARTS_IMAGE_WORKERS)) || 4));
+  for (let lane = 0; lane < lanes; lane++) {
+    let shard = lane;
     const timer = setTimeout(() => {
       timers.delete(timer);
-      if (!stopping) loop(`images-${shard}`, 1000, () => transferImages(shard));
-    }, 1500 + shard * 700);
+      if (!stopping) loop(`images-${lane}`, 1000, () => {
+        const current = shard;
+        shard = shard + lanes < 8 ? shard + lanes : lane;
+        return transferImages(current);
+      });
+    }, 1500 + lane * 700);
     timers.add(timer);
   }
   loop('image-status', 60000, imageStatus);
