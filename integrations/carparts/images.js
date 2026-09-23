@@ -29,7 +29,7 @@ async function transferImages(shard = 0) {
         ['createdAt', 'ASC'],
         ['id', 'ASC'],
       ],
-      limit: 24,
+      limit: 64,
     });
     if (!rows.length) return { processed: 0 };
     const direct = process.env.CARPARTS_IMAGE_DIRECT === 'true';

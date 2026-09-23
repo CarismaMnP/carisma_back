@@ -48,8 +48,14 @@ function loop(name, delay, fn) {
   loop('catalog', Number(process.env.CARPARTS_SYNC_INTERVAL_MS) || 300000, () =>
     syncCatalog({ stageOnly: process.env.CARPARTS_STAGE_ONLY === 'true' }),
   );
-  for (let shard = 0; shard < 8; shard++)
-    loop(`images-${shard}`, 1000, () => transferImages(shard));
+  // Stagger initial SSH handshakes to keep checkout probes responsive.
+  for (let shard = 0; shard < 8; shard++) {
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      if (!stopping) loop(`images-${shard}`, 1000, () => transferImages(shard));
+    }, 1500 + shard * 700);
+    timers.add(timer);
+  }
   loop('image-status', 60000, imageStatus);
   loop('sales', 5000, processSales);
   loop('reservations', 60000, reconcileReservations);
