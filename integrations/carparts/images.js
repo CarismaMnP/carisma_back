@@ -21,11 +21,11 @@ async function transferImages(shard = 0) {
         ),
       },
       order: [
-        ['attempts', 'ASC'],
         [
           literal(`CASE WHEN source->>'PrimaryImage'=source->>'ImageNumber' THEN 1 ELSE 0 END`),
           'DESC',
         ],
+        ['attempts', 'ASC'],
         ['createdAt', 'ASC'],
         ['id', 'ASC'],
       ],
