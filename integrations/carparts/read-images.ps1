@@ -14,6 +14,10 @@ try{
    if($source -notmatch '^P:\\[0-9]{4}\\[A-Za-z0-9_-]+\\[A-Za-z0-9_-]+\.(jpg|jpeg|png)$'){throw 'Unsupported image path'}
    $path=[IO.Path]::GetFullPath('D:\CPIMAGES\'+$source.Substring(3))
    if(!$path.StartsWith('D:\CPIMAGES\',[StringComparison]::OrdinalIgnoreCase)){throw 'Image path outside storage'}
+   if(!(Test-Path -LiteralPath $path) -or (Get-Item -LiteralPath $path).Length -eq 0){
+    $web=[IO.Path]::Combine([IO.Path]::GetDirectoryName($path),[IO.Path]::GetFileNameWithoutExtension($path)+'_web.jpg')
+    if((Test-Path -LiteralPath $web) -and (Get-Item -LiteralPath $web).Length -gt 0){$path=$web}else{throw 'Source image file is missing or empty'}
+   }
    $info=Get-Item -LiteralPath $path
    if($info.Length -gt 20MB){throw 'Image exceeds 20 MB'}
    $bytes=[IO.File]::ReadAllBytes($path);$sha=[Security.Cryptography.SHA256]::Create()
