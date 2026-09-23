@@ -2,7 +2,7 @@ const { Op, literal } = require('sequelize');
 const sharp = require('sharp');
 const { PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { s3, bucketName } = require('../../db');
+const { sequelize, s3, bucketName } = require('../../db');
 const { CarpartsImage, CarpartsSyncState } = require('../../models/models');
 const { bridge } = require('./transport');
 const { hash } = require('./normalize');
@@ -29,7 +29,7 @@ async function transferImages(shard = 0) {
         ['createdAt', 'ASC'],
         ['id', 'ASC'],
       ],
-      limit: 64,
+      limit: 24,
     });
     if (!rows.length) return { processed: 0 };
     const direct = process.env.CARPARTS_IMAGE_DIRECT === 'true';
@@ -56,6 +56,7 @@ async function transferImages(shard = 0) {
       { timeout: 180000 },
     );
     if (!result.ok || !Array.isArray(result.images)) throw Error('Incomplete image response');
+    const updates = [];
     const received = new Map(result.images.map(x => [x.id, x]));
     let copied = 0,
       errors = 0;
@@ -72,7 +73,10 @@ async function transferImages(shard = 0) {
             if (direct) {
               if (!/^[a-f0-9]{64}$/.test(image.sha256) || !(image.bytes > 0))
                 throw Error('Invalid upload receipt');
-              await row.update({
+              updates.push({
+                id: row.id,
+                attempts: row.attempts,
+                nextAttemptAt: row.nextAttemptAt,
                 url: `${base}/carparts/9032/${row.guid}/${row.id}.jpg`,
                 sha256: image.sha256,
                 bytes: image.bytes,
@@ -98,7 +102,10 @@ async function transferImages(shard = 0) {
                 CacheControl: 'public, max-age=31536000, immutable',
               }),
             );
-            await row.update({
+            updates.push({
+              id: row.id,
+              attempts: row.attempts,
+              nextAttemptAt: row.nextAttemptAt,
               url: `${base}/${key}`,
               sha256: hash(data),
               bytes: data.length,
@@ -107,7 +114,8 @@ async function transferImages(shard = 0) {
             copied++;
           } catch (e) {
             errors++;
-            await row.update({
+            updates.push({
+              id: row.id,
               attempts: row.attempts + 1,
               lastError: e.message.slice(0, 1000),
               nextAttemptAt: new Date(
@@ -117,7 +125,14 @@ async function transferImages(shard = 0) {
           }
         }),
       );
-    return { processed: rows.length, copied, errors };
+    // Persist a batch with one commit; replaying an unacknowledged upload writes
+    // the same immutable object key. Do not resurrect retired image manifests.
+    if (updates.length)
+      await sequelize.query(
+        `UPDATE carparts_images AS i SET url=d.url,sha256=d.sha256,bytes=d.bytes,attempts=d.attempts,"lastError"=d."lastError","nextAttemptAt"=d."nextAttemptAt","updatedAt"=NOW() FROM jsonb_to_recordset($1::jsonb) AS d(id text,url text,sha256 text,bytes integer,attempts integer,"lastError" text,"nextAttemptAt" timestamptz) WHERE i.id=d.id AND i.url IS NULL`,
+        { bind: [JSON.stringify(updates)] },
+      );
+    return { processed: rows.length, copied, errors, timing: result.timing };
   });
 }
 async function imageStatus() {

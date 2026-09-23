@@ -1,3 +1,6 @@
+jest.mock('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: jest.fn(async () => 'https://storage.example.invalid/image'),
+}));
 // Explicitly isolated PostgreSQL only. No bridge, Stripe or email calls in these tests.
 jest.mock('../../integrations/carparts/transport', () => ({
   bridge: jest.fn(() => {
@@ -295,5 +298,47 @@ suite('CarParts transactional integration', () => {
     expect(gone.sourceMissing).toBe(true);
     expect(gone.carpartsGuid).toBe(guid);
     expect((await unknown.reload()).count).toBe(1);
+  });
+  test('image receipts persist atomically, including retryable failures', async () => {
+    process.env.CARPARTS_IMAGE_DIRECT = 'true';
+    const { CarpartsImage } = models;
+    const good = await CarpartsImage.create({
+      id: '0'.repeat(64),
+      guid,
+      source: { id: '0'.repeat(64), GUID: guid },
+    });
+    const bad = await CarpartsImage.create({
+      id: '1'.repeat(64),
+      guid,
+      source: { id: '1'.repeat(64), GUID: guid },
+    });
+    require('../../integrations/carparts/transport').bridge.mockResolvedValue({
+      ok: true,
+      images: [
+        { id: good.id, sha256: 'a'.repeat(64), bytes: 100 },
+        { id: bad.id, error: 'Temporary upload failure' },
+      ],
+    });
+    const result = await require('../../integrations/carparts/images').transferImages(0);
+    expect(result.copied).toBe(1);
+    expect(result.errors).toBe(1);
+    expect((await good.reload()).url).toContain(good.id);
+    expect((await bad.reload()).attempts).toBe(1);
+    expect(bad.url).toBeNull();
+  });
+  test('an image retired during upload cannot be recreated by an old receipt', async () => {
+    process.env.CARPARTS_IMAGE_DIRECT = 'true';
+    const { CarpartsImage } = models;
+    const image = await CarpartsImage.create({
+      id: '0'.repeat(64),
+      guid,
+      source: { id: '0'.repeat(64), GUID: guid },
+    });
+    require('../../integrations/carparts/transport').bridge.mockImplementation(async () => {
+      await image.destroy();
+      return { ok: true, images: [{ id: image.id, sha256: 'a'.repeat(64), bytes: 100 }] };
+    });
+    await require('../../integrations/carparts/images').transferImages(0);
+    expect(await CarpartsImage.count()).toBe(0);
   });
 });

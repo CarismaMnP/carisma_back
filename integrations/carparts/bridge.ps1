@@ -2,8 +2,10 @@
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 [Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false)
 try {
- # A newline frame avoids waiting for EOF on Windows OpenSSH console handles.
- $inputText=[Console]::In.ReadLine();if(!$inputText -or $inputText.Length -gt 131072){throw 'Invalid request size'}
+ # The forced key exposes the opaque command as data. Never execute it.
+ # Windows OpenSSH stdin delivery is unreliable during console startup.
+ $inputText=$env:SSH_ORIGINAL_COMMAND
+ if(!$inputText -or $inputText.Length -gt 24000 -or !$inputText.StartsWith('gzip:')){throw 'Invalid request envelope'}
  if($inputText.StartsWith('gzip:')){
   $stream=New-Object IO.MemoryStream(,[Convert]::FromBase64String($inputText.Substring(5)))
   $gzip=New-Object IO.Compression.GzipStream($stream,[IO.Compression.CompressionMode]::Decompress)

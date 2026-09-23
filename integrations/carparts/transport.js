@@ -3,6 +3,8 @@ const path = require('path');
 const { gzipSync, gunzipSync } = require('zlib');
 function bridge(request, { timeout = 180000, maxBytes = 160 * 1024 * 1024 } = {}) {
   const base = process.env.CARPARTS_SSH_DIR || '/etc/carisma';
+  const payload = 'gzip:' + gzipSync(Buffer.from(JSON.stringify(request))).toString('base64');
+  if (payload.length > 24000) return Promise.reject(Error('Checkmate request too large'));
   const args = [
     '-F',
     '/dev/null',
@@ -25,10 +27,10 @@ function bridge(request, { timeout = 180000, maxBytes = 160 * 1024 * 1024 } = {}
     '-p',
     '22022',
     'CACHE@127.0.0.1',
-    'bridge',
+    payload,
   ];
   return new Promise((resolve, reject) => {
-    const child = spawn('ssh', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn('ssh', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let parts = [],
       err = '',
       bytes = 0,
@@ -46,7 +48,6 @@ function bridge(request, { timeout = 180000, maxBytes = 160 * 1024 * 1024 } = {}
       timeout,
     );
     child.on('error', fail);
-    child.stdin.on('error', fail);
     child.stdout.on('data', d => {
       bytes += d.length;
       if (bytes > maxBytes) return fail(Error('Checkmate response too large'));
@@ -77,9 +78,6 @@ function bridge(request, { timeout = 180000, maxBytes = 160 * 1024 * 1024 } = {}
         reject(Error(`Checkmate bridge: ${e.message}; exit=${code}; ${err.slice(0, 1000)}`));
       }
     });
-    child.stdin.end(
-      'gzip:' + gzipSync(Buffer.from(JSON.stringify(request))).toString('base64') + '\n',
-    );
   });
 }
 module.exports = { bridge };

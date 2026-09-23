@@ -31,7 +31,7 @@ Cross-channel checkout is not a distributed transaction: a part can sell elsewhe
 - `CARPARTS_IMAGE_DIRECT=true` for Windows-to-S3 uploads.
 - Optional `CARPARTS_S3_PUBLIC_URL` and `CARPARTS_SSH_DIR` override existing storage/access locations.
 
-The dedicated key at `/etc/carisma/carparts_ed25519` connects only through the existing loopback tunnel on port 22022. Windows authorized_keys forces `C:/CarismaSync/bridge.ps1` and disallows forwarding. Host keys are pinned. Requests and responses are compressed and framed; the bridge only accepts the documented catalog, stock, image and sale actions. Deploy all `.ps1` files and `ImageUpload.cs` from `integrations/carparts` together.
+The dedicated key at `/etc/carisma/carparts_ed25519` connects only through the existing loopback tunnel on port 22022. Windows authorized_keys forces `C:/CarismaSync/bridge.ps1` and disallows forwarding. Host keys are pinned. Requests are gzip/base64 envelopes passed through SSH_ORIGINAL_COMMAND as data, never executed. This avoids unreliable Windows SSH stdin delivery. Responses are compressed; the bridge only accepts the documented catalog, stock, image and sale actions. Deploy all `.ps1` files and `ImageUpload.cs` from `integrations/carparts` together.
 
 Windows `C:\CarismaSync\config.json` has `enableSales`, `salesAfter` and `uploadHost`. Both Linux and Windows sale gates must be enabled. `uploadHost` is the existing object-storage endpoint hostname. Never put the website database password or permanent S3 keys on Windows.
 

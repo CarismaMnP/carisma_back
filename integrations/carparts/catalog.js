@@ -71,10 +71,14 @@ async function syncCatalog({ snapshot, stageOnly = false } = {}) {
         'ebayLegacyId',
         'count',
         'isDeleted',
+        'carpartsHash',
+        'imagesHash',
+        'sourceMissing',
       ],
       raw: true,
     });
     const byGuid = new Map(products.filter(p => p.carpartsGuid).map(p => [p.carpartsGuid, p.id]));
+    const byId = new Map(products.map(p => [p.id, p]));
     const byLegacy = new Map(
       products
         .filter(p => !p.isManual && !p.carpartsGuid && p.ebayLegacyId)
@@ -103,6 +107,22 @@ async function syncCatalog({ snapshot, stageOnly = false } = {}) {
       );
       let id = byGuid.get(item.guid) || candidates[0]?.id;
       if (!id && !item.data.available) continue;
+      const previousProduct = byId.get(id);
+      const photoUrls = item.data.photos.map(x => urls.get(x.id));
+      const photosReady = photoUrls.every(Boolean);
+      // An unchanged source needs no row lock or stock rewrite. Website
+      // reservations and payments own their current local stock value.
+      if (
+        previousProduct?.source === 'carparts' &&
+        !previousProduct.isManual &&
+        previousProduct.carpartsGuid === item.guid &&
+        previousProduct.carpartsHash === item.hash &&
+        !previousProduct.sourceMissing &&
+        (!photosReady || previousProduct.imagesHash === item.imagesHash)
+      ) {
+        stats.unchanged++;
+        continue;
+      }
       await sequelize.transaction(async transaction => {
         let product = id
           ? await Product.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE })
@@ -116,8 +136,6 @@ async function syncCatalog({ snapshot, stageOnly = false } = {}) {
           item.data.available && !product?.websiteSold && !product?.adminHidden
             ? Math.max(0, 1 - reserved)
             : 0;
-        const photoUrls = item.data.photos.map(x => urls.get(x.id));
-        const photosReady = photoUrls.every(Boolean);
         if (
           product?.carpartsHash === item.hash &&
           !product.sourceMissing &&

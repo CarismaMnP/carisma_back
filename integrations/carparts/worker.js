@@ -8,7 +8,7 @@ let stopping = false;
 const timers = new Set(),
   active = new Set();
 function loop(name, delay, fn) {
-  let failures = 0;
+  let failures = 1;
   async function tick() {
     if (stopping) return;
     let nextDelay = delay;
