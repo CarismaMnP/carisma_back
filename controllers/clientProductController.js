@@ -79,6 +79,7 @@ class ProductController {
         order: [
           ['ebayCategory', 'ASC'],
           ['name', 'ASC'],
+          ['id', 'ASC'],
         ],
         attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory", "make"],
         limit,
