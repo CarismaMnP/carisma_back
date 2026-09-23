@@ -4,7 +4,7 @@ require('dotenv').config({ path: `.env.${env}` });
 const { sequelize } = require('./db');
 const models = require('./models/models');
 const createServer = require('./utils/server');
-const { scheduleEbayCatalogJob } = require('./utils/ebayCatalogJob');
+// CarParts runs as a separately supervised worker; no marketplace importer in the API.
 
 const PORT = process.env.PORT || 5050;
 
@@ -27,62 +27,19 @@ process.on('uncaughtException', (error) => {
 
 const start = async () => {
     try {
-        // await sequelize.authenticate();
-        await sequelize.sync();
-
-        await models.User.findOrCreate({
-            where: {
-
-                name : "Administrator",
-                mail : "info@carismamp.com",
-                phone : "89127864632",
-                password : "242CaRismA516716!@#",
-                role : "ADMINISTRATOR",
-                prevCodeDatetime : null,
-                wrongRecoveryCodeAttempts : 0,
-                recoveryCode : "",
-                category : "Basic",
-                discount : 0,
-                total : 0,
-                smsCode : null,
-            }
-        })
-
-        // models.BlockData.findOrCreate({
-        //     where: {
-        //         name: "products"
-        //     },
-        //     defaults: {
-        //         data: {
-        //           categories: [
-        //             { id: 1, layout: "bigLeftVideo" },
-        //             { id: 2, layout: "rightImage" },
-        //             { id: 3, layout: "leftImage" },
-        //             { id: 4, layout: "centerImage" }
-        //           ]
-        //         }
-        //     }
-        // })
-
-        // Запускать cron jobs только если не отключены
-        // Используйте DISABLE_CRON_JOBS=true для API реплик
-        const shouldRunCronJobs = process.env.DISABLE_CRON_JOBS !== 'true';
-
-        if (shouldRunCronJobs) {
-            console.log('[Cron] Starting eBay catalog sync job...');
-            scheduleEbayCatalogJob();
-        } else {
-            console.log('[Cron] Skipping cron jobs (DISABLE_CRON_JOBS=true)');
-        }
+        await sequelize.authenticate();
 
         // Запускать HTTP сервер только если не worker mode
         if (process.env.CRON_JOBS_ONLY !== 'true') {
-            app.listen(PORT, () => console.log(`Server started on ${PORT}`));
+            const server=app.listen(PORT, () => console.log(`Server started on ${PORT}`));
+            const stop=()=>server.close(async()=>{await sequelize.close();process.exit(0)});
+            process.on('SIGINT',stop);process.on('SIGTERM',stop);
         } else {
             console.log('[Worker] Running as cron worker, HTTP server disabled');
         }
     } catch (e) {
-        console.error('Failed to start server:', e);
+        console.error('Failed to start server:', e.message);
+        process.exitCode=1;await sequelize.close();
     }
 };
 

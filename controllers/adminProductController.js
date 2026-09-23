@@ -12,7 +12,7 @@ class ProductController {
       limit = limit || 1000
       let offset = page * limit - limit
 
-      const whereClause = {}
+      const whereClause = {isDeleted: false}
       if (search) {
         whereClause.name = {
           [Op.like]: `%${search}%`
@@ -27,7 +27,7 @@ class ProductController {
         include: [{model: Category}]
       })
 
-      const active = await Product.count({where: {...whereClause, count: {[Op.ne]: 0}}})
+      const active = await Product.count({where: {...whereClause, count: {[Op.gt]: 0}}})
 
       return res.json({active, ...products})
     } catch (e) {
@@ -54,7 +54,7 @@ class ProductController {
     }
   }
 
-  async createProduct(req, res, next, { isManual = false } = {}) {
+  async createProduct(req, res, next, { isManual = true } = {}) {
     console.log("createProduct")
     try {
       let files = req.files?.files;
@@ -106,6 +106,7 @@ class ProductController {
         : (typeof ebayAlsoFits === 'string' && ebayAlsoFits ? JSON.parse(ebayAlsoFits) : undefined);
 
       const product = await Product.create({
+        source: 'manual',
         name,
         description,
         link,
@@ -144,7 +145,7 @@ class ProductController {
   }
 
   async create(req, res, next) {
-    return this.createProduct(req, res, next, { isManual: false });
+    return this.createProduct(req, res, next, { isManual: true });
   }
 
   async createManual(req, res, next) {
@@ -158,6 +159,9 @@ class ProductController {
         files = [files]
       }
       const {id} = req.query;
+      const existing=await Product.findByPk(id);
+      if(!existing)return next(ApiError.badRequest('Product not found'));
+      if(existing.source==='carparts')return res.status(409).json({message:'This product is managed in Checkmate. Create a manual copy to manage a separate item.'});
       const {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
@@ -218,7 +222,7 @@ class ProductController {
         farmer,
         keyDescriptor,
         brightness,
-        images: filesData,
+        ...(filesData.length ? {images: filesData} : {}),
         recipe: recipeJSON,
         additionalFields: additionalFieldsJSON,
         selector: selectorJSON,
@@ -311,8 +315,7 @@ class ProductController {
   async delete(req, res, next) {
     try {
       let {id} = req.query;
-      const uid = v4()
-      await Product.update({link: uid, isDeleted: true}, {where: {id}})
+      await Product.update({isDeleted: true, adminHidden: true, count: 0}, {where: {id}})
       return res.json("Deleted successfully");
     } catch (e) {
       next(ApiError.badRequest(e.message))

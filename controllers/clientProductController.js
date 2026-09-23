@@ -9,7 +9,7 @@ class ProductController {
     try {
       const products = await Product.findAll({
         attributes: ['make', 'ebayModel', 'ebayCategory'],
-        where: { isDeleted: false, count: {[Op.ne]: 0} },
+        where: { isDeleted: false, count: {[Op.gt]: 0} },
         raw: true,
       });
 
@@ -65,7 +65,7 @@ class ProductController {
 
       const where = {
         isDeleted: false,
-        count: {[Op.ne]: 0},
+        count: {[Op.gt]: 0},
         ...(make ? { make } : {}),
         ...(model ? { ebayModel: model } : {}),
         ...(category ? { ebayCategory: category } : {}),
@@ -119,7 +119,7 @@ class ProductController {
       const limit = 12;
 
       const products = await Product.findAll({
-        where: { isDeleted: false, count: {[Op.ne]: 0} },
+        where: { isDeleted: false, count: {[Op.gt]: 0} },
         order: [['createdAt', 'DESC']],
         attributes: ["id", "name", "link", "images", "price", "count", "ebayStock", "ebayModel", "ebayCategory", "make"],
         limit,
@@ -179,7 +179,7 @@ class ProductController {
         categories = await Category.findAll({
           where: {
             isDeleted: false,
-            count: {[Op.ne]: 0},
+            count: {[Op.gt]: 0},
             [Op.or]: [{id: categoryId}, {parentId: categoryId}]
           }
         })
@@ -191,7 +191,7 @@ class ProductController {
         where: {
           ...(!!regionsArray?.length ? {region: {[Op.in]: regionsArray}} : {}),
           isDeleted: false,
-          count: {[Op.ne]: 0},
+          count: {[Op.gt]: 0},
           ...(categoryId ? {categoryId: {[Op.in]: categoryIds}} : {}),
         },
         limit, offset, order: [['name', 'ASC']], include: [{model: Category}]

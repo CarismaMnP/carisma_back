@@ -1,513 +1,210 @@
-const { Order, CartProduct, OrderProduct, Product } = require('../models/models');
-const { verifyWebhookSignature, getCheckoutSession } = require('../utils/stripe');
+const { Order, OrderProduct, Product } = require('../models/models');
+const { verifyWebhookSignature, getCheckoutSession, stripe } = require('../utils/stripe');
+const { confirmPayment, releaseReservation } = require('../integrations/carparts/orders');
 const { sendOrderConfirmation, sendOrderNotification } = require('../utils/mailer');
 
 class StripeWebhookController {
-    /**
-     * Reduce product count after successful order payment
-     * For eBay products (isManual = false), set count to 0
-     * For manual products (isManual = true), decrease count by ordered amount
-     */
-    async decreaseProductStock(orderId) {
-        try {
-            // Get all products from the order
-            const orderProducts = await OrderProduct.findAll({
-                where: { orderId },
-                include: [{ model: Product, required: true }]
+  extractShippingAddressFromCheckoutSession(session) {
+    // Stripe API (2025-03-31+) stores shipping details in collected_information.shipping_details.
+    // Keep backward compatibility with older versions where shipping_details is at the top level.
+    const shippingDetails =
+      session?.collected_information?.shipping_details || session?.shipping_details || null;
+    const address = shippingDetails?.address || session?.customer_details?.address || null;
+    if (!address) {
+      return null;
+    }
+
+    const deliveryInstructionsField = Array.isArray(session?.custom_fields)
+      ? session.custom_fields.find(field => field?.key === 'delivery_instructions')
+      : null;
+    const deliveryInstructions = deliveryInstructionsField?.text?.value || null;
+
+    return {
+      country: address.country || null,
+      city: address.city || null,
+      zip_code: address.postal_code || null,
+      addressState: address.state || null,
+      address_line_1: address.line1 || null,
+      address_line_2: address.line2 || null,
+      ...(deliveryInstructions !== null ? { delivery_instructions: deliveryInstructions } : {}),
+    };
+  }
+
+  async handleWebhook(req, res) {
+    const signature = req.headers['stripe-signature'];
+    const payload = req.body;
+
+    let event;
+
+    try {
+      // Verify webhook signature
+      event = verifyWebhookSignature(payload, signature);
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !event.livemode &&
+      process.env.STRIPE_ACCEPT_TEST_EVENTS !== 'true'
+    )
+      return res.json({ received: true, ignored: 'test event' });
+    try {
+      const object = event.data.object;
+      switch (event.type) {
+        case 'checkout.session.completed':
+        case 'checkout.session.async_payment_succeeded':
+          if (object.payment_status === 'paid') await this.confirmSession(object, event);
+          break;
+        case 'payment_intent.succeeded':
+          if (object.metadata?.orderId) {
+            const sessions = await stripe.checkout.sessions.list({
+              payment_intent: object.id,
+              limit: 1,
             });
+            if (!sessions.data.length) throw Error('Paid checkout session not found');
+            await this.confirmSession(sessions.data[0], event);
+          }
+          break;
+        case 'checkout.session.expired':
+          if (object.metadata?.orderId)
+            await releaseReservation(object.metadata.orderId, 'expired');
+          break;
+        case 'checkout.session.async_payment_failed':
+          if (object.metadata?.orderId)
+            await releaseReservation(object.metadata.orderId, 'payment_failed');
+          break;
+        case 'charge.refunded':
+          await this.handleChargeRefunded(object);
+          break;
+        case 'charge.dispute.created':
+          await this.handleChargeDisputeCreated(object);
+          break;
+      }
+      return res.json({ received: true });
+    } catch (error) {
+      console.error('Payment reconciliation failed:', error.message);
+      return res.status(500).send('Webhook processing failed');
+    }
+  }
 
-            for (const orderProduct of orderProducts) {
-                const product = orderProduct.product;
-                const orderedCount = orderProduct.count;
+  async confirmSession(session, event) {
+    const orderId = session.metadata?.orderId;
+    if (!orderId) return;
+    const order = await Order.findByPk(orderId);
+    if (!order) throw Error('Paid order not found');
+    const full = await getCheckoutSession(session.id);
+    if (
+      full.payment_status !== 'paid' ||
+      full.currency !== 'usd' ||
+      full.metadata?.orderId !== orderId ||
+      full.livemode !== event.livemode ||
+      Number(full.amount_subtotal) !== Math.round(Number(order.sum) * 100) ||
+      (order.checkoutSessionId && order.checkoutSessionId !== full.id)
+    )
+      throw Error('Payment does not match the checkout order');
+    const updates = {
+      checkoutSessionId: full.id,
+      tax: (full.total_details?.amount_tax || 0) / 100,
+      total: (full.amount_total || 0) / 100,
+    };
+    if (order.delivey_type === 'ups')
+      Object.assign(updates, this.extractShippingAddressFromCheckoutSession(full) || {});
+    const result = await confirmPayment(orderId, {
+      paymentIntentId: session.payment_intent,
+      paidLive: event.livemode === true,
+      paidAt: new Date(event.created * 1000),
+      updates,
+    });
+    if (result.applied) await this.sendOrderConfirmationEmail(result.order);
+  }
 
-                if (!product) {
-                    console.error(`Product not found for OrderProduct ${orderProduct.id}`);
-                    continue;
-                }
+  /**
+   * Send order confirmation email with product details
+   */
+  async sendOrderConfirmationEmail(order) {
+    try {
+      const orderProducts = await OrderProduct.findAll({
+        where: { orderId: order.id },
+        include: [{ model: Product, required: true }],
+      });
 
-                if (product.isManual === false) {
-                    // eBay товар - обнуляем count
-                    await product.update({ count: 0 });
-                    console.log(`eBay product ${product.id} (${product.name}) - set count to 0`);
-                } else {
-                    // Ручной товар - уменьшаем count на количество в заказе
-                    const newCount = Math.max(0, product.count - orderedCount);
-                    await product.update({ count: newCount });
-                    console.log(`Manual product ${product.id} (${product.name}) - decreased count from ${product.count} to ${newCount}`);
-                }
+      const products = orderProducts.map(op => ({
+        name: op.product.name,
+        count: op.count,
+        price: op.product.price,
+      }));
+
+      const shippingAddress =
+        order.delivey_type === 'ups' && order.address_line_1
+          ? {
+              name: order.fullName,
+              line1: order.address_line_1,
+              line2: order.address_line_2,
+              city: order.city,
+              state: order.addressState,
+              postal_code: order.zip_code,
+              country: order.country || 'US',
             }
+          : null;
 
-            console.log(`Stock decreased for order ${orderId}`);
-        } catch (error) {
-            console.error(`Error decreasing stock for order ${orderId}:`, error);
-            throw error;
-        }
+      await sendOrderConfirmation({
+        email: order.mail,
+        orderId: order.id,
+        fullName: order.fullName,
+        products,
+        subtotal: order.sum,
+        tax: order.tax || 0,
+        total: order.total || order.sum,
+        shippingAddress,
+      });
+
+      await sendOrderNotification({
+        email: 'info@carismamp.com',
+        orderId: order.id,
+        fullName: order.fullName,
+        products,
+        subtotal: order.sum,
+        tax: order.tax || 0,
+        total: order.total || order.sum,
+        shippingAddress,
+      });
+    } catch (error) {
+      console.error(`Error sending order confirmation email for order ${order.id}:`, error);
+      // Don't throw - email failure shouldn't break the webhook
+    }
+  }
+
+  async handleChargeRefunded(charge) {
+    console.log('Charge refunded:', charge.id);
+    const paymentIntentId = charge.payment_intent;
+
+    if (!paymentIntentId) {
+      return;
     }
 
-    extractShippingAddressFromCheckoutSession(session) {
-        // Stripe API (2025-03-31+) stores shipping details in collected_information.shipping_details.
-        // Keep backward compatibility with older versions where shipping_details is at the top level.
-        const shippingDetails = session?.collected_information?.shipping_details || session?.shipping_details || null;
-        const address = shippingDetails?.address || session?.customer_details?.address || null;
-        if (!address) {
-            return null;
-        }
+    const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
+    if (order) {
+      await order.update({ state: 'refunded' });
+      console.log(`Order ${order.id} marked as refunded`);
+    }
+  }
 
-        const deliveryInstructionsField = Array.isArray(session?.custom_fields)
-            ? session.custom_fields.find((field) => field?.key === 'delivery_instructions')
-            : null;
-        const deliveryInstructions = deliveryInstructionsField?.text?.value || null;
+  async handleChargeDisputeCreated(dispute) {
+    console.log('Charge dispute created:', dispute.id);
+    const paymentIntentId = dispute.payment_intent;
 
-        return {
-            country: address.country || null,
-            city: address.city || null,
-            zip_code: address.postal_code || null,
-            addressState: address.state || null,
-            address_line_1: address.line1 || null,
-            address_line_2: address.line2 || null,
-            ...(deliveryInstructions !== null ? { delivery_instructions: deliveryInstructions } : {}),
-        };
+    if (!paymentIntentId) {
+      return;
     }
 
-    async handleWebhook(req, res) {
-        const signature = req.headers['stripe-signature'];
-        const payload = req.body;
-
-        let event;
-
-        try {
-            // Verify webhook signature
-            event = verifyWebhookSignature(payload, signature);
-        } catch (err) {
-            console.error('Webhook signature verification failed:', err.message);
-            return res.status(400).send(`Webhook Error: ${err.message}`);
-        }
-
-        console.log('Received Stripe webhook event:', event.type);
-
-        try {
-            // Handle the event
-            switch (event.type) {
-                case 'checkout.session.completed':
-                    await this.handleCheckoutSessionCompleted(event.data.object);
-                    break;
-
-                case 'checkout.session.async_payment_succeeded':
-                    await this.handleCheckoutSessionAsyncPaymentSucceeded(event.data.object);
-                    break;
-
-                case 'checkout.session.async_payment_failed':
-                    await this.handleCheckoutSessionAsyncPaymentFailed(event.data.object);
-                    break;
-
-                case 'checkout.session.expired':
-                    await this.handleCheckoutSessionExpired(event.data.object);
-                    break;
-
-                case 'payment_intent.succeeded':
-                    await this.handlePaymentIntentSucceeded(event.data.object);
-                    break;
-
-                case 'payment_intent.payment_failed':
-                    await this.handlePaymentIntentFailed(event.data.object);
-                    break;
-
-                case 'payment_intent.canceled':
-                    await this.handlePaymentIntentCanceled(event.data.object);
-                    break;
-
-                case 'payment_intent.created':
-                    await this.handlePaymentIntentCreated(event.data.object);
-                    break;
-
-                case 'payment_intent.processing':
-                    await this.handlePaymentIntentProcessing(event.data.object);
-                    break;
-
-                case 'charge.succeeded':
-                    await this.handleChargeSucceeded(event.data.object);
-                    break;
-
-                case 'charge.failed':
-                    await this.handleChargeFailed(event.data.object);
-                    break;
-
-                case 'charge.refunded':
-                    await this.handleChargeRefunded(event.data.object);
-                    break;
-
-                case 'charge.dispute.created':
-                    await this.handleChargeDisputeCreated(event.data.object);
-                    break;
-
-                default:
-                    console.log(`Unhandled event type: ${event.type}`);
-            }
-
-            res.json({ received: true });
-        } catch (error) {
-            console.error('Error processing webhook:', error);
-            res.status(500).send('Webhook processing failed');
-        }
+    const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
+    if (order) {
+      await order.update({ state: 'disputed' });
+      console.log(`Order ${order.id} marked as disputed`);
     }
-
-    async handleCheckoutSessionCompleted(session) {
-        console.log('Checkout session completed:', session.id);
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in session metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        // Retrieve full session details to get tax information
-        const fullSession = await getCheckoutSession(session.id);
-
-        // Extract tax and total information
-        const tax = fullSession.total_details?.amount_tax || 0;
-        const total = fullSession.amount_total || 0;
-
-        const orderUpdates = {};
-
-        // Save shipping address from Stripe (delivery info should come from Stripe for UPS)
-        if (order.delivey_type === 'ups') {
-            const shippingUpdate = this.extractShippingAddressFromCheckoutSession(fullSession);
-            if (shippingUpdate) {
-                Object.assign(orderUpdates, shippingUpdate);
-            }
-        }
-
-        // Update order state to confirmed if payment was successful immediately
-        if (session.payment_status === 'paid') {
-            Object.assign(orderUpdates, {
-                state: 'confirmed',
-                stripePaymentIntentId: session.payment_intent,
-                tax: tax / 100, // Convert from cents to dollars
-                total: total / 100, // Convert from cents to dollars
-            });
-        }
-
-        if (Object.keys(orderUpdates).length) {
-            await order.update(orderUpdates);
-        }
-
-        if (session.payment_status === 'paid') {
-            console.log(`Order ${orderId} confirmed - payment completed. Tax: $${tax / 100}, Total: $${total / 100}`);
-
-            // Clear user's cart after successful payment
-            const userId = order.userId;
-            if (userId) {
-                const deletedCount = await CartProduct.destroy({
-                    where: { userId }
-                });
-                console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
-            }
-
-            // Decrease product stock
-            await this.decreaseProductStock(orderId);
-
-            // Send order confirmation email
-            await this.sendOrderConfirmationEmail(order);
-        }
-    }
-
-    /**
-     * Send order confirmation email with product details
-     */
-    async sendOrderConfirmationEmail(order) {
-        try {
-            const orderProducts = await OrderProduct.findAll({
-                where: { orderId: order.id },
-                include: [{ model: Product, required: true }]
-            });
-
-            const products = orderProducts.map(op => ({
-                name: op.product.name,
-                count: op.count,
-                price: op.product.price,
-            }));
-
-            const shippingAddress = order.delivey_type === 'ups' && order.address_line_1 ? {
-                name: order.fullName,
-                line1: order.address_line_1,
-                line2: order.address_line_2,
-                city: order.city,
-                state: order.addressState,
-                postal_code: order.zip_code,
-                country: order.country || 'US',
-            } : null;
-
-            await sendOrderConfirmation({
-                email: order.mail,
-                orderId: order.id,
-                fullName: order.fullName,
-                products,
-                subtotal: order.sum,
-                tax: order.tax || 0,
-                total: order.total || order.sum,
-                shippingAddress,
-            });
-            
-            await sendOrderNotification({
-                email: "info@carismamp.com",
-                orderId: order.id,
-                fullName: order.fullName,
-                products,
-                subtotal: order.sum,
-                tax: order.tax || 0,
-                total: order.total || order.sum,
-                shippingAddress,
-            });
-        } catch (error) {
-            console.error(`Error sending order confirmation email for order ${order.id}:`, error);
-            // Don't throw - email failure shouldn't break the webhook
-        }
-    }
-
-    async handleCheckoutSessionAsyncPaymentSucceeded(session) {
-        console.log('Checkout session async payment succeeded:', session.id);
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in session metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        // Retrieve full session details to get tax and shipping information
-        const fullSession = await getCheckoutSession(session.id);
-
-        // Extract tax and total information
-        const tax = fullSession.total_details?.amount_tax || 0;
-        const total = fullSession.amount_total || 0;
-
-        const orderUpdates = {
-            state: 'confirmed',
-            stripePaymentIntentId: session.payment_intent,
-            tax: tax / 100, // Convert from cents to dollars
-            total: total / 100, // Convert from cents to dollars
-        };
-
-        // Save shipping address from Stripe (delivery info should come from Stripe for UPS)
-        if (order.delivey_type === 'ups') {
-            const shippingUpdate = this.extractShippingAddressFromCheckoutSession(fullSession);
-            if (shippingUpdate) {
-                Object.assign(orderUpdates, shippingUpdate);
-            }
-        }
-
-        await order.update(orderUpdates);
-        console.log(`Order ${orderId} confirmed - async payment succeeded`);
-
-        // Clear user's cart after successful payment
-        const userId = order.userId;
-        if (userId) {
-            const deletedCount = await CartProduct.destroy({
-                where: { userId }
-            });
-            console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
-        }
-
-        // Decrease product stock
-        await this.decreaseProductStock(orderId);
-
-        // Send order confirmation email
-        await this.sendOrderConfirmationEmail(order);
-    }
-
-    async handleCheckoutSessionAsyncPaymentFailed(session) {
-        console.log('Checkout session async payment failed:', session.id);
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in session metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        await order.update({ state: 'payment_failed' });
-        console.log(`Order ${orderId} marked as payment_failed`);
-    }
-
-    async handleCheckoutSessionExpired(session) {
-        console.log('Checkout session expired:', session.id);
-        const orderId = session.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in session metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        await order.update({ state: 'expired' });
-        console.log(`Order ${orderId} marked as expired`);
-    }
-
-    async handlePaymentIntentSucceeded(paymentIntent) {
-        console.log('Payment intent succeeded:', paymentIntent.id);
-        const orderId = paymentIntent.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in payment intent metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        await order.update({
-            state: 'confirmed',
-            stripePaymentIntentId: paymentIntent.id
-        });
-        console.log(`Order ${orderId} confirmed via payment_intent.succeeded`);
-
-        // Clear user's cart after successful payment
-        const userId = order.userId;
-        if (userId) {
-            const deletedCount = await CartProduct.destroy({
-                where: { userId }
-            });
-            console.log(`Cleared ${deletedCount} items from cart for user ${userId}`);
-        }
-
-        // Decrease product stock
-        await this.decreaseProductStock(orderId);
-
-        // Send order confirmation email
-        await this.sendOrderConfirmationEmail(order);
-    }
-
-    async handlePaymentIntentFailed(paymentIntent) {
-        console.log('Payment intent failed:', paymentIntent.id);
-        const orderId = paymentIntent.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in payment intent metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        await order.update({ state: 'payment_failed' });
-        console.log(`Order ${orderId} marked as payment_failed`);
-    }
-
-    async handlePaymentIntentCanceled(paymentIntent) {
-        console.log('Payment intent canceled:', paymentIntent.id);
-        const orderId = paymentIntent.metadata?.orderId;
-
-        if (!orderId) {
-            console.error('No orderId in payment intent metadata');
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (!order) {
-            console.error('Order not found:', orderId);
-            return;
-        }
-
-        await order.update({ state: 'canceled' });
-        console.log(`Order ${orderId} marked as canceled`);
-    }
-
-    async handlePaymentIntentCreated(paymentIntent) {
-        console.log('Payment intent created:', paymentIntent.id);
-        const orderId = paymentIntent.metadata?.orderId;
-
-        if (!orderId) {
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (order) {
-            await order.update({ stripePaymentIntentId: paymentIntent.id });
-            console.log(`Order ${orderId} updated with payment intent ID`);
-        }
-    }
-
-    async handlePaymentIntentProcessing(paymentIntent) {
-        console.log('Payment intent processing:', paymentIntent.id);
-        const orderId = paymentIntent.metadata?.orderId;
-
-        if (!orderId) {
-            return;
-        }
-
-        const order = await Order.findByPk(orderId);
-        if (order && order.state === 'pending') {
-            await order.update({ state: 'processing' });
-            console.log(`Order ${orderId} marked as processing`);
-        }
-    }
-
-    async handleChargeSucceeded(charge) {
-        console.log('Charge succeeded:', charge.id);
-        // Additional logic if needed
-    }
-
-    async handleChargeFailed(charge) {
-        console.log('Charge failed:', charge.id);
-        // Additional logic if needed
-    }
-
-    async handleChargeRefunded(charge) {
-        console.log('Charge refunded:', charge.id);
-        const paymentIntentId = charge.payment_intent;
-
-        if (!paymentIntentId) {
-            return;
-        }
-
-        const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
-        if (order) {
-            await order.update({ state: 'refunded' });
-            console.log(`Order ${order.id} marked as refunded`);
-        }
-    }
-
-    async handleChargeDisputeCreated(dispute) {
-        console.log('Charge dispute created:', dispute.id);
-        const paymentIntentId = dispute.payment_intent;
-
-        if (!paymentIntentId) {
-            return;
-        }
-
-        const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
-        if (order) {
-            await order.update({ state: 'disputed' });
-            console.log(`Order ${order.id} marked as disputed`);
-        }
-    }
+  }
 }
 
 module.exports = new StripeWebhookController();

@@ -75,6 +75,18 @@ const Product = sequelize.define('product', {
 
   isDeleted: { type: DataTypes.BOOLEAN, unique: false, defaultValue: false },
 
+  source: {type: DataTypes.STRING, allowNull: false, defaultValue: 'manual'},
+  carpartsGuid: {type: DataTypes.STRING(36), unique: true},
+  carpartsInventoryId: DataTypes.STRING,
+  carpartsTag: DataTypes.STRING,
+  carpartsHash: DataTypes.STRING(64),
+  carpartsData: DataTypes.JSONB,
+  sourceCount: DataTypes.INTEGER,
+  sourceMissing: {type: DataTypes.BOOLEAN, defaultValue: false},
+  websiteSold: {type: DataTypes.BOOLEAN, defaultValue: false},
+  adminHidden: {type: DataTypes.BOOLEAN, defaultValue: false},
+  imagesHash: DataTypes.STRING(64),
+  // Legacy fields remain for stable product URLs and compatibility with deployed clients.
   ebayItemId: { type: DataTypes.STRING, unique: true, allowNull: true },
   ebayLegacyId: { type: DataTypes.STRING, unique: true, allowNull: true },
   ebayStock: { type: DataTypes.INTEGER, unique: false, allowNull: true, defaultValue: 0 },
@@ -110,6 +122,13 @@ const Order = sequelize.define('order', {
   address_line_2: { type: DataTypes.STRING, allowNull: true },
   delivery_instructions: { type: DataTypes.STRING, allowNull: true },
   stripePaymentIntentId: { type: DataTypes.STRING, allowNull: true },
+  checkoutSessionId: DataTypes.STRING,
+  stockReservedAt: DataTypes.DATE,
+  reservationExpiresAt: DataTypes.DATE,
+  stockReleasedAt: DataTypes.DATE,
+  stockAppliedAt: DataTypes.DATE,
+  paidAt: DataTypes.DATE,
+  paidLive: {type: DataTypes.BOOLEAN, defaultValue: false},
 });
 
 const OrderProduct = sequelize.define('orderProduct', {
@@ -224,7 +243,10 @@ Product.hasMany(Recipe);
 Recipe.belongsTo(RecipeCategory)
 RecipeCategory.hasMany(Recipe);
 
+const carpartsModels = require('../integrations/carparts/models')(sequelize);
+
 module.exports = {
+  ...carpartsModels,
   User,
   Category,
   Product,

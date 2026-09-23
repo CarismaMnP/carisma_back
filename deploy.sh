@@ -1,12 +1,16 @@
-APP_NAME="carisma_backend"
-
-if pm2 describe $APP_NAME > /dev/null; then
-    echo "Stopping existing process..."
-    pm2 stop $APP_NAME
-    pm2 delete $APP_NAME
-fi
-
-echo "Starting new $APP_NAME process"
-NODE_ENV=production pm2 start "npm run start" --name $APP_NAME --watch
-
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")"
+NODE_ENV=production npx sequelize-cli db:migrate --env production
+# Replace the old npm/watch launcher and stop a one-time bootstrap worker.
+for app in carisma_backend carisma_carparts carisma_carparts_bootstrap; do
+  if pm2 describe "$app" >/dev/null 2>&1; then pm2 delete "$app"; fi
+done
+pm2 start ecosystem.config.cjs
 pm2 save
+for attempt in {1..20}; do
+  if curl -fsS 'http://127.0.0.1:5050/api/public/product?limit=1' >/dev/null; then exit 0; fi
+  sleep 2
+done
+echo 'API health check failed' >&2
+exit 1

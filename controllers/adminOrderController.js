@@ -43,8 +43,8 @@ class OrderController {
         try {
             const {id} = req.query;
             const {state, sum} = req.body;
-            const order = await Order.update({state, sum}, {where: {id}, returning: true});
-            return res.json(order[1][0])
+            const order = await require('../integrations/carparts/admin-orders').updateAdminOrder(id,{state,sum});
+            return res.json(order)
         } catch (e) {
             next(ApiError.badRequest(e.message))
         }
@@ -54,8 +54,8 @@ class OrderController {
         try {
             const {id} = req.query;
             const {state} = req.body;
-            const order = await Order.update({state}, {where: {id}, returning: true});
-            return res.json(order[1][0])
+            const order = await require('../integrations/carparts/admin-orders').updateAdminOrder(id,{state});
+            return res.json(order)
         } catch (e) {
             next(ApiError.badRequest(e.message))
         }
@@ -64,7 +64,7 @@ class OrderController {
     async cancel (req, res, next) {
         try {
             let {id} = req.query;
-            const order = await Order.update({state: "canceled"}, {where: {id}, returning: true})
+            await require('../integrations/carparts/admin-orders').updateAdminOrder(id,{state:'canceled'});
             // const updatedOrder = order[1][0]
             // await updateUserCategory(updatedOrder.userId)
             return res.json("Canceled successfully");

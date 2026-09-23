@@ -1,7 +1,6 @@
 const fs = require('fs');
 
-const env = process.env.NODE_ENV || 'local';
-require('dotenv').config({ path: `.env.${env}` });
+require('../utils/loadEnvironment');
 
 module.exports = {
   development: {

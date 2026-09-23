@@ -43,6 +43,7 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
+      expires_at: Math.floor(Date.now()/1000)+30*60,
       success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: process.env.STRIPE_CANCEL_URL,
       customer_email: customerEmail,
@@ -81,7 +82,7 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       ];
     }
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+    const session = await stripe.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
 
     return {
       url: session.url,

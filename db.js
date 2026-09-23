@@ -4,15 +4,15 @@ const { v4: uuidv4 } = require("uuid");
 const { Sequelize } = require("sequelize");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
-const env = process.env.NODE_ENV || "local";
-const env_file = ".env." + env
-require("dotenv").config({ path: env_file });
+require('./utils/loadEnvironment');
 
 const db_uri = `postgres://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
 
 
 
 const sequelize = new Sequelize(db_uri, {
+    logging: false,
+    pool: {max: 16, min: 0, acquire: 60000, idle: 10000},
     dialect: "postgres",
     protocol: "postgres",
     dialectOptions: {
@@ -30,6 +30,7 @@ const sequelize = new Sequelize(db_uri, {
 
 const s3 = new S3Client({
     region: "auto",
+    requestChecksumCalculation: 'WHEN_REQUIRED',
     endpoint: process.env.CLOUDFLARE_S3_URL,
     credentials: {
         accessKeyId: process.env.CLOUDFLARE_S3_KEY_ID,
