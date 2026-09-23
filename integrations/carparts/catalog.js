@@ -254,7 +254,7 @@ async function syncCatalog({ snapshot, stageOnly = false } = {}) {
 async function publishReadyImages() {
   const products = await Product.findAll({
     where: { source: 'carparts', count: { [Op.gt]: 0 } },
-    attributes: ['id', 'carpartsData', 'imagesHash', 'carpartsHash'],
+    attributes: ['id', 'images', 'carpartsData', 'imagesHash', 'carpartsHash'],
     raw: true,
   });
   const urls = new Map(
@@ -273,12 +273,20 @@ async function publishReadyImages() {
     const fingerprint = hash(photos.map(x => x.id));
     if (p.imagesHash === fingerprint) continue;
     const images = photos.map(x => urls.get(x.id));
-    if (!images.every(Boolean)) continue;
-    // Optimistic guard: do not overwrite a newer photo manifest.
-    const [n] = await Product.update(
-      { images, imagesHash: fingerprint },
-      { where: { id: p.id, carpartsHash: p.carpartsHash, source: 'carparts' } },
-    );
+    const complete = images.every(Boolean);
+    // New cards can show their verified primary photo while the rest of the
+    // album arrives. Existing complete albums stay visible until replacement.
+    if (!complete && (p.images?.length || !images[0])) continue;
+    const payload = complete ? { images, imagesHash: fingerprint } : { images: [images[0]] };
+    // Do not overwrite a newer manifest or a concurrently published album.
+    const [n] = await Product.update(payload, {
+      where: {
+        id: p.id,
+        carpartsHash: p.carpartsHash,
+        imagesHash: p.imagesHash,
+        source: 'carparts',
+      },
+    });
     published += n;
   }
   return published;

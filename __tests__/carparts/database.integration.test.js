@@ -311,6 +311,21 @@ suite('CarParts transactional integration', () => {
     expect(gone.carpartsGuid).toBe(guid);
     expect((await unknown.reload()).count).toBe(1);
   });
+  test('a new card shows its primary photo while the remaining album transfers', async () => {
+    const source = snapshot([row()]);
+    source.images = [1,2].map(n => ({GUID:guid,ImageNumber:n,PrimaryImage:1,ImageLocation:`P:\\2026\\test\\photo${n}.jpg`,CheckSum:`sum${n}`,WebCheckSum:`web${n}`}));
+    await catalog.syncCatalog({snapshot:source});
+    const p = await models.Product.findOne({where:{carpartsGuid:guid}});
+    const photos = p.carpartsData.photos;
+    await models.CarpartsImage.update({url:'https://storage.example.invalid/primary.jpg'}, {where:{id:photos[0].id}});
+    await catalog.publishReadyImages();
+    expect((await p.reload()).images).toEqual(['https://storage.example.invalid/primary.jpg']);
+    expect(p.imagesHash).toBeNull();
+    await models.CarpartsImage.update({url:'https://storage.example.invalid/second.jpg'}, {where:{id:photos[1].id}});
+    await catalog.publishReadyImages();
+    expect((await p.reload()).images).toEqual(['https://storage.example.invalid/primary.jpg','https://storage.example.invalid/second.jpg']);
+    expect(p.imagesHash).toBeTruthy();
+  });
   test('image receipts persist atomically, including retryable failures', async () => {
     process.env.CARPARTS_IMAGE_DIRECT = 'true';
     const { CarpartsImage } = models;

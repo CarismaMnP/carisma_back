@@ -13,11 +13,11 @@ public sealed class CarismaImageResult { public string id; public string sha256;
 public static class CarismaImageUpload {
  public static CarismaImageResult[] Upload(CarismaImageInput[] inputs) {
   ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-  ServicePointManager.DefaultConnectionLimit=16;
+  ServicePointManager.DefaultConnectionLimit=32;
   var results=new CarismaImageResult[inputs.Length];
   using(var http=new HttpClient()) {
    http.Timeout=TimeSpan.FromSeconds(90);
-   Parallel.For(0,inputs.Length,new ParallelOptions{MaxDegreeOfParallelism=8}, i=>{
+   Parallel.For(0,inputs.Length,new ParallelOptions{MaxDegreeOfParallelism=16}, i=>{
     var item=inputs[i];var result=new CarismaImageResult{id=item.id};results[i]=result;
     try {
      using(var original=Image.FromFile(item.path)) {
