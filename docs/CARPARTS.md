@@ -4,7 +4,7 @@ The source of imported inventory is Checkmate, yard 9032. The application no lon
 
 ## Inventory ownership and availability
 
-`products.source` distinguishes `carparts`, `manual`, and archived/unmapped `legacy` data. Only `carparts` products can be retired by reconciliation or create a native removal job. Admin additions and copies always become manual items. Checkmate products are edited at their source; hiding one in the website admin affects the website only.
+`products.source` distinguishes `carparts`, `manual`, and archived/unmapped `legacy` data. Only `carparts` products can be retired by reconciliation or create a native removal job. Admin additions and copies always become manual items. Checkmate products are edited at their source; hiding one in the website admin affects the website only. Archived legacy aliases cannot be edited back into available stock; an explicit manual copy creates a separately managed item.
 
 One GUID represents one physical part. Eligible rows have Part other than AUT, Available=Yes, Private other than Yes, blank Status, no work order/hold and positive retail price. Status S is sold even if Available still says Yes. A complete missing record also becomes unavailable. A partial snapshot, inconsistent counts, wrong yard, duplicate GUIDs or a drop exceeding 20% stops reconciliation for review. Current site reservations, paid sales and admin hides cannot be resurrected by later imports.
 

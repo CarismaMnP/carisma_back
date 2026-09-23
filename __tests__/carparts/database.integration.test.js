@@ -311,6 +311,16 @@ suite('CarParts transactional integration', () => {
     expect(gone.carpartsGuid).toBe(guid);
     expect((await unknown.reload()).count).toBe(1);
   });
+  test('an archived imported alias cannot be reactivated by editing its quantity', async () => {
+    const product = await models.Product.create({name:'Archived alias',link:'archived-alias',source:'legacy',isManual:false,count:0,price:25,images:[]});
+    const response = {status:jest.fn().mockReturnThis(),json:jest.fn()};
+    const next = jest.fn();
+    await require('../../controllers/adminProductController').update({query:{id:product.id},body:{data:JSON.stringify({count:1})}},response,next);
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(next).not.toHaveBeenCalled();
+    expect((await product.reload()).count).toBe(0);
+    expect(product.source).toBe('legacy');
+  });
   test('a new card shows its primary photo while the remaining album transfers', async () => {
     const source = snapshot([row()]);
     source.images = [1,2].map(n => ({GUID:guid,ImageNumber:n,PrimaryImage:1,ImageLocation:`P:\\2026\\test\\photo${n}.jpg`,CheckSum:`sum${n}`,WebCheckSum:`web${n}`}));

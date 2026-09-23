@@ -162,6 +162,7 @@ class ProductController {
       const existing=await Product.findByPk(id);
       if(!existing)return next(ApiError.badRequest('Product not found'));
       if(existing.source==='carparts')return res.status(409).json({message:'This product is managed in Checkmate. Create a manual copy to manage a separate item.'});
+      if(existing.source==='legacy')return res.status(409).json({message:'This is an archived imported product. Create a manual copy to manage a separate item.'});
       const {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
