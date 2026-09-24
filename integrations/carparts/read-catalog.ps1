@@ -11,7 +11,7 @@ function Read-Q([string]$sql){
 try{
  $c.Open();$r=[ordered]@{version=1;complete=$false;startedAt=[DateTime]::UtcNow.ToString('o');yard='9032'}
  $r.beforeCount=@(Read-Q "SELECT COUNT(*) AS N FROM SQLUser.Inventory WHERE Yard=9032 AND Part<>'AUT'")[0].N
- $r.items=@(Read-Q "SELECT CAST(p.ID AS VARCHAR(200)) AS InventoryID,p.GUID,p.Tag,p.Stock,p.Yard,p.Part,p.Description,p.PriceRetail,p.Status,p.DisplayStatus,p.Available,p.Private,p.TimeStamp,p.WONum,p.HoldName,p.AssemblyParentGUID,p.Manufacturer,p.Model,p.Yr,p.VIN,p.Condition,p.PartGrade,p.Side,p.Interchange,p.EbayOriginalListingID,p.ItemSpecifics,p.AutGUID FROM SQLUser.Inventory p WHERE p.Yard=9032 AND p.Part<>'AUT'")
+ $r.items=@(Read-Q "SELECT CAST(p.ID AS VARCHAR(200)) AS InventoryID,p.GUID,p.Tag,p.Stock,p.Yard,p.Part,p.Description,p.PriceRetail,p.Status,p.DisplayStatus,p.EbayStatus,p.Available,p.Private,p.TimeStamp,p.WONum,p.HoldName,p.AssemblyParentGUID,p.Manufacturer,p.Model,p.Yr,p.VIN,p.Condition,p.PartGrade,p.Side,p.Interchange,p.EbayOriginalListingID,p.ItemSpecifics,p.AutGUID FROM SQLUser.Inventory p WHERE p.Yard=9032 AND p.Part<>'AUT'")
  $r.parts=@(Read-Q 'SELECT Part,FullName FROM SQLUser.Part')
  $r.vehicles=@(Read-Q 'SELECT GUID,ModelLong,Make,Mileage FROM SQLUser.InventoryAUT WHERE Yard=9032')
  $r.images=@(Read-Q 'SELECT i.GUID,i.ImageLocation,i.ImageNumber,i.PrimaryImage,i.CheckSum,i.WebCheckSum FROM SQLUser.PartImage i INNER JOIN SQLUser.Inventory p ON i.GUID=p.GUID WHERE p.Yard=9032 AND i.PrivateImage=0')
@@ -35,7 +35,7 @@ try{
  }
  if($missing.Count -gt $r.images.Count*0.1){throw 'Image storage appears incomplete; snapshot rejected'}
  $r.images=$present.ToArray();$r.missingImages=$missing.ToArray()
- # Existing IDs are only migration links; source eligibility never depends on an eBay listing.
+ # Existing IDs are only migration links; publication does not require a listing. Committed sales use Inventory.EbayStatus.
  $r.legacyLinks=@();if($IncludeLegacyHistory){$r.legacyLinks=@(Read-Q 'SELECT GUID,CAST(ItemID AS VARCHAR(30)) AS ItemID FROM SQLUser.EbayStatus UNION SELECT GUID,CAST(ItemID AS VARCHAR(30)) AS ItemID FROM SQLUser.EbayHistory WHERE GUID IS NOT NULL')}
  $r.afterCount=@(Read-Q "SELECT COUNT(*) AS N FROM SQLUser.Inventory WHERE Yard=9032 AND Part<>'AUT'")[0].N
  $r.finishedAt=[DateTime]::UtcNow.ToString('o');$r.complete=$true

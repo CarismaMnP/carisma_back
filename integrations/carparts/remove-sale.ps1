@@ -13,7 +13,7 @@ function Read-Q([string]$sql,[object[]]$values=@()){
  $rd=$q.ExecuteReader();$rows=New-Object System.Collections.Generic.List[object]
  try{while($rd.Read()){$row=[ordered]@{};for($i=0;$i -lt $rd.FieldCount;$i++){$v=$rd.GetValue($i);if($v -is [DBNull]){$v=$null};$row[$rd.GetName($i)]=$v};$rows.Add([pscustomobject]$row)}}finally{$rd.Close();$q.Dispose()};return $rows.ToArray()
 }
-function Target {return @(Read-Q 'SELECT CAST(ID AS VARCHAR(200)) AS InventoryID,GUID,Tag,Yard,Part,Status,Available,Private,WONum,HoldName,TimeStamp,AssemblyParentGUID FROM SQLUser.Inventory WHERE GUID=?' @($guid))}
+function Target {return @(Read-Q 'SELECT CAST(ID AS VARCHAR(200)) AS InventoryID,GUID,Tag,Yard,Part,Status,DisplayStatus,EbayStatus,Available,Private,WONum,HoldName,TimeStamp,AssemblyParentGUID FROM SQLUser.Inventory WHERE GUID=?' @($guid))}
 try{
  $c.Open();$rows=@(Target)
  if($rows.Count -eq 0){
@@ -22,7 +22,7 @@ try{
  }
  if($rows.Count -ne 1){Review 'Ambiguous inventory GUID';return};$t=$rows[0]
  if($t.InventoryID -ne $Request.inventoryId -or $t.Tag -ne $Request.tag -or $t.Yard -ne 9032 -or $t.Part -eq 'AUT'){Review 'Inventory identity mismatch';return}
- if(([string]$t.Status).Trim() -ne '' -or $t.Available -ine 'Yes' -or $t.Private -ieq 'Yes' -or $t.WONum -or $t.HoldName){
+ if(([string]$t.Status).Trim() -ne '' -or ([string]$t.EbayStatus).Trim() -ieq 'C' -or ([string]$t.DisplayStatus).Trim() -ieq 'C' -or $t.Available -ine 'Yes' -or $t.Private -ieq 'Yes' -or $t.WONum -or $t.HoldName){
   [pscustomobject]@{ok=$false;state='unavailable';writeCalled=$false}|ConvertTo-Json -Compress;return
  }
  if($t.AssemblyParentGUID -and $t.AssemblyParentGUID -ne 'X'){Review 'Assembly part requires review';return}

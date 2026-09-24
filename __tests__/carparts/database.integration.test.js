@@ -172,6 +172,19 @@ suite('CarParts transactional integration', () => {
     await orders.confirmPayment(order.id, { paidLive: false });
     expect(await models.CarpartsJob.count()).toBe(0);
   });
+  test('a committed sale blocks checkout immediately and disappears on reconciliation', async () => {
+    await catalog.syncCatalog({ snapshot: snapshot([row()]) });
+    const p = await models.Product.findOne({ where: { carpartsGuid: guid } });
+    const sold = { ...row(), EbayStatus: 'C', DisplayStatus: 'C' };
+    require('../../integrations/carparts/transport').bridge.mockResolvedValue({ ok: true, items: [sold] });
+    await expect(reserve(p.id)).rejects.toThrow('changed availability or price');
+    expect(await models.Order.count()).toBe(0);
+    expect(await models.CarpartsJob.count()).toBe(0);
+    await catalog.syncCatalog({ snapshot: snapshot([sold]) });
+    expect((await p.reload()).count).toBe(0);
+    expect(p.carpartsData.reason).toBe('committed');
+    expect(await models.CarpartsJob.count()).toBe(0);
+  });
   test('a disconnected source cannot reserve stock or create an order', async () => {
     await catalog.syncCatalog({ snapshot: snapshot([row()]) });
     const p = await models.Product.findOne({ where: { carpartsGuid: guid } });

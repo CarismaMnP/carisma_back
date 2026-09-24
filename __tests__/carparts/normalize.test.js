@@ -70,3 +70,18 @@ test('hashes actual binary bytes', () =>
   expect(hash(Buffer.from('abc'))).toBe(
     'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
   ));
+
+test.each([{ EbayStatus: 'C' }, { DisplayStatus: ' C ' }])(
+  'a committed marketplace sale is unavailable even with blank Status and Available=Yes: %j',
+  fields => {
+    const sold = snapshot();
+    sold.items[0] = { ...row, ...fields };
+    const p = normalizeSnapshot(sold)[0];
+    expect(p.data.available).toBe(false);
+    expect(p.data.reason).toBe('committed');
+    expect(p.hash).not.toBe(normalizeSnapshot(snapshot())[0].hash);
+  },
+);
+test.each(['E', 'X', '', null])('listing status %s alone does not block unsold stock', EbayStatus => {
+  expect(availability({ ...row, EbayStatus })).toBe('available');
+});

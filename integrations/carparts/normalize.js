@@ -11,6 +11,9 @@ function availability(row) {
   if (text(row.Private).toLowerCase() === 'yes') return 'private';
   if (text(row.Available).toLowerCase() !== 'yes') return 'unavailable';
   if (text(row.Status)) return `status:${text(row.Status)}`;
+  // Checkmate C means sold on eBay, awaiting an invoice; Available can still be Yes.
+  if ([row.EbayStatus, row.DisplayStatus].some(v => text(v).toUpperCase() === 'C'))
+    return 'committed';
   if (text(row.WONum) || text(row.HoldName)) return 'allocated';
   if (!(Number(row.PriceRetail) > 0)) return 'unpriced';
   return 'available';
