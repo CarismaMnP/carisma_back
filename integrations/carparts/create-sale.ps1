@@ -17,7 +17,7 @@ function Save {
  $tmp=$statePath+'.tmp'
  $f=New-Object IO.FileStream($tmp,[IO.FileMode]::Create,[IO.FileAccess]::Write,[IO.FileShare]::None,4096,[IO.FileOptions]::WriteThrough)
  try{$f.Write($bytes,0,$bytes.Length);$f.Flush($true)}finally{$f.Dispose()}
- if(Test-Path -LiteralPath $statePath){[IO.File]::Replace($tmp,$statePath,$null)}else{[IO.File]::Move($tmp,$statePath)}
+ if(Test-Path -LiteralPath $statePath){[IO.File]::Replace($tmp,$statePath,($statePath+'.previous'))}else{[IO.File]::Move($tmp,$statePath)}
 }
 function Text([object]$value,[int]$max=100) {
  $s=([string]$value).Trim() -replace '[\x00-\x1f\x7f}]',' '
