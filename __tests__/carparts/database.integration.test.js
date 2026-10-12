@@ -218,7 +218,7 @@ suite('CarParts transactional integration', () => {
     bridge.mockReset();
     bridge
       .mockRejectedValueOnce(Error('Disconnected after request'))
-      .mockResolvedValueOnce({ ok: true, state: 'already_removed' });
+      .mockResolvedValueOnce({ok:true,state:'already_posted',orderId:order.id,workOrder:'900',invoice:'800',taxCents:0,subtotalCents:2500});
     const { processSales } = require('../../integrations/carparts/sales');
     await processSales();
     const job = await models.CarpartsJob.findOne();
@@ -231,7 +231,7 @@ suite('CarParts transactional integration', () => {
     expect(bridge.mock.calls[0][0].orderId).toBe(order.id);
     expect(bridge.mock.calls[1][0].orderId).toBe(order.id);
   });
-  test('historical orders cannot trigger native deletion after cutover', async () => {
+  test('historical orders cannot trigger a native sale after cutover', async () => {
     await catalog.syncCatalog({ snapshot: snapshot([row()]) });
     const p = await models.Product.findOne({ where: { carpartsGuid: guid } });
     const { order } = await reserve(p.id);
@@ -400,4 +400,87 @@ suite('CarParts transactional integration', () => {
     await require('../../integrations/carparts/images').transferImages(0);
     expect(await CarpartsImage.count()).toBe(0);
   });
+  test('native sales group multiple physical parts, retain checkout prices and preserve manual inventory', async () => {
+    process.env.CARPARTS_SALES_ENABLED = 'true';process.env.CARPARTS_SALES_AFTER = '2020-01-01T00:00:00Z';
+    const g2='22222222-2222-4222-8222-222222222222';
+    await catalog.syncCatalog({snapshot:snapshot([row(),row(g2)])});
+    const ps=await models.Product.findAll({order:[['id','ASC']]});
+    const manual=await models.Product.create({name:'Manual',link:'manual',images:[],source:'manual',count:3,price:7});
+    const {order}=await orders.reserveOrder({userId:1,fullName:'Buyer',mail:'test@example.invalid',products:[...ps.map(p=>({productId:p.id,count:1})),{productId:manual.id,count:2}]});
+    await orders.confirmPayment(order.id,{paidLive:true,updates:{tax:4.8,total:68.8,billingAddress:{line1:'Invoice street'},shippingAddress:{line1:'Delivery street'}}});
+    await ps[0].update({price:999});
+    const bridge=require('../../integrations/carparts/transport').bridge;
+    bridge.mockImplementation(async payload => ({ok:true,state:'posted',orderId:payload.orderId,workOrder:'900',invoice:'800',taxCents:0,subtotalCents:5000}));
+    const {processSales}=require('../../integrations/carparts/sales');
+    expect((await processSales()).processed).toBe(2);
+    const payload=bridge.mock.calls.at(-1)[0];expect(payload.action).toBe('createSale');expect(payload.lines).toHaveLength(2);
+    expect(payload.lines.map(l=>l.priceCents)).toEqual([2500,2500]);expect(payload.customer.shipping.line1).toBe('Delivery street');
+    expect(payload.websiteTaxCents).toBe(480);expect(payload.taxMode).toBe('not_taxable');
+    expect((await order.reload()).checkmateInvoice).toBe('800');
+    expect(await models.CarpartsJob.count({where:{state:'succeeded'}})).toBe(2);
+    expect((await ps[0].reload()).sourceMissing).toBe(false);expect((await manual.reload()).count).toBe(1);
+    expect((await processSales()).processed).toBe(0);expect(bridge.mock.calls.filter(c=>c[0].action==='createSale')).toHaveLength(1);
+  });
+  test('lost response retries immutable request; uncertain native result is held without another automatic attempt', async () => {
+    process.env.CARPARTS_SALES_ENABLED='true';process.env.CARPARTS_SALES_AFTER='2020-01-01T00:00:00Z';
+    await catalog.syncCatalog({snapshot:snapshot([row()])});const p=await models.Product.findOne();
+    const {order}=await reserve(p.id);await orders.confirmPayment(order.id,{paidLive:true});
+    const bridge=require('../../integrations/carparts/transport').bridge;
+    bridge.mockRejectedValueOnce(Error('connection lost'));
+    const {processSales}=require('../../integrations/carparts/sales');await processSales();
+    const first=bridge.mock.calls.at(-1)[0];await order.update({fullName:'Later edit'});
+    await models.CarpartsJob.update({nextAttemptAt:new Date(0)},{where:{orderId:order.id}});
+    bridge.mockResolvedValueOnce({ok:false,state:'review_required',error:'Uncertain native call'});await processSales();
+    expect(bridge.mock.calls.at(-1)[0]).toEqual(first);expect((await models.CarpartsJob.findOne()).state).toBe('review');
+    expect((await processSales()).processed).toBe(0);
+  });
+  test('normal worker excludes authorized test orders; only explicit test process can post them', async () => {
+    process.env.CARPARTS_SALES_ENABLED='true';process.env.CARPARTS_SALES_AFTER='2020-01-01T00:00:00Z';
+    await catalog.syncCatalog({snapshot:snapshot([row()])});const p=await models.Product.findOne();
+    const testId=require('crypto').randomUUID();
+    await expect(orders.reserveOrder({products:[{productId:p.id,count:1}]},{authorizedTestId:testId})).rejects.toThrow('authorized');
+    process.env.CARPARTS_TEST_ORDER_ID=testId;
+    const {order}=await orders.reserveOrder({userId:1,fullName:'TEST',mail:'test@example.invalid',products:[{productId:p.id,count:1}]},{authorizedTestId:testId});
+    await orders.confirmPayment(order.id,{paidLive:false});
+    const {processSales}=require('../../integrations/carparts/sales');expect((await processSales()).processed).toBe(0);
+    expect((await models.CarpartsJob.findOne()).state).toBe('pending');
+    const bridge=require('../../integrations/carparts/transport').bridge;
+    bridge.mockImplementation(async payload=>({ok:true,state:'posted',orderId:payload.orderId,workOrder:'901',invoice:'801',taxCents:0,subtotalCents:2500}));
+    expect((await processSales({testOrderId:testId})).processed).toBe(1);expect((await order.reload()).paidLive).toBe(false);
+    delete process.env.CARPARTS_TEST_ORDER_ID;
+  });
+  test('profile name fills only blank matching account, never overwrites an existing name', async () => {
+    const {fillMissingCustomerName}=require('../../utils/customerName');
+    const u=await models.User.findByPk(1);await u.update({name:'   '});
+    await fillMissingCustomerName({userId:1,mail:' TEST@EXAMPLE.INVALID ',fullName:'  New   Buyer '});
+    expect((await u.reload()).name).toBe('New Buyer');
+    await fillMissingCustomerName({userId:1,mail:u.mail,fullName:'Replacement'});expect((await u.reload()).name).toBe('New Buyer');
+    await u.update({name:''});await fillMissingCustomerName({userId:1,mail:'other@example.invalid',fullName:'Other'});expect((await u.reload()).name).toBe('');
+  });
+  test('product filters include hidden/out of stock rows and use case insensitive literal search', async () => {
+    const {filters}=require('../../utils/adminProductFilters');
+    await models.Product.bulkCreate([
+      {name:'Audi Part',link:'a',images:[],make:'Audi',ebayModel:'Q5',price:10,count:1},
+      {name:'Audi Sold',link:'b',images:[],make:'Audi',ebayModel:'Q5',price:20,count:0},
+      {name:'Hidden',link:'c',images:[],price:2,count:1,isDeleted:true},
+      {name:'Percent%part',link:'d',images:[],price:5,count:1},
+    ]);
+    let f=filters({active:'true',inactive:'true',make:'Audi',sort:'price_desc',minPrice:'10',maxPrice:'20'});
+    expect((await models.Product.findAll({where:f.where,order:f.order})).map(p=>p.name)).toEqual(['Audi Sold','Audi Part']);
+    f=filters({active:'false',inactive:'true'});expect(await models.Product.count({where:f.where})).toBe(2);
+    f=filters({search:'%'});expect(await models.Product.count({where:f.where})).toBe(1);
+  });
+
+  test('additive migration backfills latest matching paid customer name and preserves existing names', async () => {
+    const u=await models.User.findByPk(1);await u.update({name:' '});
+    const other=await models.User.create({id:2,mail:'retained@example.invalid',name:'Chosen name'});
+    await models.Order.create({userId:1,fullName:'  Elizabeth   Example  ',mail:u.mail,state:'confirmed',sum:10});
+    await models.Order.create({userId:other.id,fullName:'Overwrite',mail:other.mail,state:'confirmed',sum:10});
+    const q=sequelize.getQueryInterface();
+    for(const field of ['isIntegrationTest','shippingAmount','billingAddress','shippingAddress','checkmatePayload','checkmateWorkOrder','checkmateInvoice']) await q.removeColumn('orders',field);
+    for(const field of ['unitPriceCents','productSnapshot']) await q.removeColumn('orderProducts',field);
+    await require('../../migrations/20261012010000-checkmate-invoices').up(q,require('sequelize'));
+    expect((await u.reload()).name).toBe('Elizabeth Example');expect((await other.reload()).name).toBe('Chosen name');
+  });
+
 });

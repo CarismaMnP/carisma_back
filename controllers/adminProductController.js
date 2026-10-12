@@ -7,32 +7,30 @@ const { Op } = require('sequelize');
 class ProductController {
   async fetch(req, res, next) {
     try {
-      let {page, limit, search} = req.query
-      page = page || 1
-      limit = limit || 1000
-      let offset = page * limit - limit
-
-      const whereClause = {isDeleted: false}
-      if (search) {
-        whereClause.name = {
-          [Op.like]: `%${search}%`
-        }
-      }
-
-      const products = await Product.findAndCountAll({
-        where: whereClause,
-        limit,
-        offset,
-        order: [['createdAt', 'DESC']],
-        include: [{model: Category}]
-      })
-
-      const active = await Product.count({where: {...whereClause, count: {[Op.gt]: 0}}})
-
-      return res.json({active, ...products})
+      const f = require('../utils/adminProductFilters').filters(req.query);
+      const [products, active, inactive] = await Promise.all([
+        Product.findAndCountAll({where:f.where, limit:f.limit, offset:f.offset, order:f.order, include:[{model:Category}]}),
+        Product.count({where:{[Op.and]:[f.base,f.available]}}),
+        Product.count({where:{[Op.and]:[f.base,f.unavailable]}}),
+      ]);
+      return res.json({...products,active,inactive,page:f.page,limit:f.limit});
     } catch (e) {
       next(ApiError.badRequest(e.message))
     }
+  }
+
+  async filters(req, res, next) {
+    try {
+      const rows = await Product.findAll({attributes:['make','ebayModel'], group:['make','ebayModel'],
+        order:[['make','ASC'],['ebayModel','ASC']],raw:true});
+      const makes = new Map();
+      for (const row of rows) {
+        if (!row.make) continue;
+        if (!makes.has(row.make)) makes.set(row.make, []);
+        if (row.ebayModel) makes.get(row.make).push(row.ebayModel);
+      }
+      res.json([...makes].map(([make,models]) => ({make,models})));
+    } catch(e) {next(ApiError.badRequest(e.message));}
   }
 
   async fetchOne(req, res, next) {

@@ -108,6 +108,9 @@ class StripeWebhookController {
       checkoutSessionId: full.id,
       tax: (full.total_details?.amount_tax || 0) / 100,
       total: (full.amount_total || 0) / 100,
+      shippingAmount: (full.total_details?.amount_shipping || 0) / 100,
+      billingAddress: full.customer_details?.address || null,
+      shippingAddress: full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
     };
     if (order.delivey_type === 'ups')
       Object.assign(updates, this.extractShippingAddressFromCheckoutSession(full) || {});

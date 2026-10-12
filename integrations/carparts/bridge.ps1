@@ -19,7 +19,8 @@ try {
   'uploadImages' { & "$PSScriptRoot\upload-images.ps1" -Request $request }
   'stock' { & "$PSScriptRoot\read-stock.ps1" -Request $request }
   'auditSale' { & "$PSScriptRoot\remove-sale.ps1" -Request $request -AuditOnly }
-  'removeSale' { & "$PSScriptRoot\remove-sale.ps1" -Request $request }
+  'createSale' { & "$PSScriptRoot\create-sale.ps1" -Request $request }
+  'auditInvoiceSale' { & "$PSScriptRoot\create-sale.ps1" -Request $request -AuditOnly }
   default {throw 'Unsupported bridge action'}
  }
  $bytes=[Text.Encoding]::UTF8.GetBytes([string]$response)

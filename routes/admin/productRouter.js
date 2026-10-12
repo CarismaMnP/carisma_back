@@ -3,6 +3,7 @@ const router = new Router()
 const productController = require('../../controllers/adminProductController')
 
 router.get('/', productController.fetch)
+router.get('/filters', productController.filters)
 router.get('/category', productController.fetchByCategory)
 router.get('/ebay_categories', productController.getEbayCategories)
 router.get('/makes', productController.getMakes)

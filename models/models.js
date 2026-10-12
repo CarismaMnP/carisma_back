@@ -129,6 +129,13 @@ const Order = sequelize.define('order', {
   stockAppliedAt: DataTypes.DATE,
   paidAt: DataTypes.DATE,
   paidLive: {type: DataTypes.BOOLEAN, defaultValue: false},
+  isIntegrationTest: {type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false},
+  shippingAmount: {type: DataTypes.DECIMAL(12, 2), defaultValue: 0},
+  billingAddress: DataTypes.JSONB,
+  shippingAddress: DataTypes.JSONB,
+  checkmatePayload: DataTypes.JSONB,
+  checkmateWorkOrder: DataTypes.STRING,
+  checkmateInvoice: DataTypes.STRING,
 });
 
 const OrderProduct = sequelize.define('orderProduct', {
@@ -137,6 +144,8 @@ const OrderProduct = sequelize.define('orderProduct', {
   productId: { type: DataTypes.INTEGER, allowNull: false },
   count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   selectorValue: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
+  unitPriceCents: DataTypes.INTEGER,
+  productSnapshot: DataTypes.JSONB,
 });
 
 const CartProduct = sequelize.define('cartProduct', {
@@ -244,6 +253,7 @@ Recipe.belongsTo(RecipeCategory)
 RecipeCategory.hasMany(Recipe);
 
 const carpartsModels = require('../integrations/carparts/models')(sequelize);
+carpartsModels.CarpartsJob.belongsTo(Order, {foreignKey: 'orderId', constraints: false});
 
 module.exports = {
   ...carpartsModels,

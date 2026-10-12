@@ -10,6 +10,7 @@ const {
 } = require('../../models/models');
 const { bridge } = require('./transport');
 const { availability } = require('./normalize');
+const { fillMissingCustomerName } = require('../../utils/customerName');
 function orderItems(input) {
   if (!Array.isArray(input) || !input.length || input.length > 100)
     throw Error('Invalid order items');
@@ -23,7 +24,9 @@ function orderItems(input) {
   }
   return [...items].sort((a, b) => a[0] - b[0]).map(([productId, count]) => ({ productId, count }));
 }
-async function reserveOrder(data) {
+async function reserveOrder(data, { authorizedTestId } = {}) {
+  if (authorizedTestId && (process.env.CARPARTS_TEST_ORDER_ID !== authorizedTestId || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(authorizedTestId)))
+    throw Error('Integration test order is not explicitly authorized');
   const items = orderItems(data.products);
   const sourced = await Product.findAll({
     where: { id: { [Op.in]: items.map(x => x.productId) }, source: 'carparts' },
@@ -112,11 +115,17 @@ async function reserveOrder(data) {
         sum: sum / 100,
         stockReservedAt: now,
         reservationExpiresAt: new Date(now.getTime() + 35 * 60000),
+        ...(authorizedTestId ? {id: authorizedTestId, isIntegrationTest: true} : {}),
       },
       { transaction },
     );
     await OrderProduct.bulkCreate(
-      items.map(x => ({ ...x, orderId: order.id, selectorValue: '' })),
+      items.map(x => {
+        const p = products.find(product => product.id === x.productId);
+        return { ...x, orderId: order.id, selectorValue: '', unitPriceCents: Math.round(p.price * 100),
+          productSnapshot: {name: p.name, source: p.source, guid: p.carpartsGuid,
+            inventoryId: p.carpartsInventoryId, tag: p.carpartsTag} };
+      }),
       { transaction },
     );
     for (const p of products)
@@ -162,9 +171,13 @@ async function confirmPayment(
   return sequelize.transaction(async transaction => {
     const order = await Order.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
     if (!order) throw Error('Paid order not found');
+    const testAuthorized = order.isIntegrationTest && process.env.CARPARTS_TEST_ORDER_ID === order.id;
+    if (order.isIntegrationTest && (!testAuthorized || paidLive))
+      throw Error('Integration test must be explicitly authorized and cannot claim a live payment');
     // Multiple Stripe event types and webhook retries must share one atomic stock operation.
     if (order.stockAppliedAt) {
       if (Object.keys(updates).length) await order.update(updates, { transaction });
+      await fillMissingCustomerName(order, transaction);
       return { order, applied: false };
     }
     const items = await OrderProduct.findAll({
@@ -182,9 +195,9 @@ async function confirmPayment(
       if (!order.stockReservedAt || order.stockReleasedAt)
         await p.update({ count: Math.max(0, p.count - item.count) }, { transaction });
       if (p.source === 'carparts') {
-        if (item.count !== 1) throw Error('Cannot remove multiple physical parts with one GUID');
+        if (item.count !== 1) throw Error('Cannot sell multiple physical parts with one GUID');
         await p.update({ count: 0, websiteSold: true }, { transaction });
-        if (paidLive) {
+        if (paidLive || testAuthorized) {
           const [job] = await CarpartsJob.findOrCreate({
             where: { guid: p.carpartsGuid },
             defaults: {
@@ -211,6 +224,7 @@ async function confirmPayment(
       },
       { transaction },
     );
+    await fillMissingCustomerName(order, transaction);
     await CartProduct.destroy({
       where: { userId: order.userId, productId: { [Op.in]: items.map(x => x.productId) } },
       transaction,

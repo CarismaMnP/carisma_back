@@ -27,6 +27,7 @@ async function getStatus() {
         'state',
         'attempts',
         'lastError',
+        'result',
         'updatedAt',
       ],
     }),
