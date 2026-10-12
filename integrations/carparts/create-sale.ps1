@@ -174,7 +174,7 @@ try {
  $h=Header;VerifyDetails -Complete;VerifyPayment $h
  if($h.WOStatus-ne'Posted' -or [long]$h.InvoiceNum-le0){throw 'Invoice posting outcome unknown'}
  foreach($line in $lines){$t=Target $line;if(([string]$t.Status).Trim()-ne'S' -or [string]$t.WONum-ne[string]$state.wo){throw 'Inventory is not sold on this work order'}}
- $state.invoice=[string]$h.InvoiceNum;Save
+ $state.fingerprint=$fingerprint;$state.invoice=[string]$h.InvoiceNum;Save
  [pscustomobject]@{ok=$true;state=$(if($writeCalled){'posted'}else{'already_posted'});orderId=$id;workOrder=$state.wo;invoice=$state.invoice;subtotalCents=$totalCents;taxCents=0;writeCalled=$writeCalled;lineCount=$lines.Count}|ConvertTo-Json -Compress
 }catch {
  [pscustomobject]@{ok=$false;state='review_required';orderId=$Request.orderId;workOrder=$state.wo;writeCalled=$writeCalled;error=$_.Exception.Message}|ConvertTo-Json -Compress
