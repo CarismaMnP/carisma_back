@@ -131,10 +131,10 @@ try {
  if($AuditOnly){[pscustomobject]@{ok=$true;state='audit_only';orderId=$id;workOrder=$state.wo;writeCalled=$false;lines=$lines.Count;subtotalCents=$totalCents;taxCents=0}|ConvertTo-Json -Compress;return}
  $config=Get-Content -Raw -LiteralPath "$PSScriptRoot\config.json"|ConvertFrom-Json
  $testAllowed=($Request.isIntegrationTest-eq$true -and $Request.paidLive-ne$true -and $config.testSale.orderId-eq$id -and
-  $lines.Count-eq1 -and $lines[0].guid-eq$config.testSale.guid -and [datetime]$config.testSale.expiresAt-gt[datetime]::UtcNow)
+  $lines.Count-eq1 -and $lines[0].guid-eq$config.testSale.guid -and [datetimeoffset]$config.testSale.expiresAt-gt[datetimeoffset]::UtcNow)
  if($config.enableSales-ne$true -or (!$testAllowed -and ($Request.paidLive-ne$true -or $Request.isIntegrationTest-eq$true)) -or
     !$config.salesAfter -or !$Request.paidAt -or !$Request.createdAt -or
-    [datetime]$Request.paidAt-lt[datetime]$config.salesAfter -or [datetime]$Request.createdAt-lt[datetime]$config.salesAfter){throw 'Sale is not authorized'}
+    [datetimeoffset]$Request.paidAt-lt[datetimeoffset]$config.salesAfter -or [datetimeoffset]$Request.createdAt-lt[datetimeoffset]$config.salesAfter){throw 'Sale is not authorized'}
  if(!(Test-Path -LiteralPath (Split-Path $statePath))){$null=New-Item -ItemType Directory -Path (Split-Path $statePath)}
  if(!$state.wo){Native 'create' 'WOCreate' $fields;$headers=@(Headers)
   if($headers.Count-ne1){throw 'WOCreate outcome unknown'};$state.wo=[string]$headers[0].WONum;Save}
