@@ -4,7 +4,7 @@ $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'create-sale.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Sale script has syntax errors'}
 . "$PSScriptRoot\native-sale-contract.ps1"
-foreach($name in @('Save','Native')){
+foreach($name in @('Save','Native','Canonical','EmailAddress')){
  $fn=$ast.Find({param($node) $node-is[Management.Automation.Language.FunctionDefinitionAst] -and $node.Name-eq$name},$true)
  . ([scriptblock]::Create($fn.Extent.Text))
 }
@@ -27,7 +27,11 @@ try {
  if(!$blocked -or $script:calls-ne2){throw 'Uncertain write was replayed'}
  $AuditOnly=$true;$blocked=$false;try{Native 'post' 'PostInvoice' ([ordered]@{})}catch{$blocked=$_.Exception.Message-eq'Audit cannot write'}
  if(!$blocked -or $script:calls-ne2){throw 'Audit attempted a write'}
+ if((EmailAddress 'mailto:buyer@example.invalid')-ne'buyer@example.invalid'){throw 'Native email prefix normalization failed'}
+ $a=Canonical ('{"customer":{"name":"Test","email":"x"},"lines":[{"price":776,"guid":"a"}],"empty":[]}'|ConvertFrom-Json)
+ $b=Canonical ('{"empty":[],"lines":[{"guid":"a","price":776}],"customer":{"email":"x","name":"Test"}}'|ConvertFrom-Json)
+ if(($a|ConvertTo-Json -Depth 15 -Compress)-cne($b|ConvertTo-Json -Depth 15 -Compress)){throw 'Payload hash depends on JSON property order'}
  $future=[datetimeoffset]::UtcNow.AddMinutes(30)
  foreach($offset in @(-4,0,5)){if([datetimeoffset]($future.ToOffset([timespan]::FromHours($offset)).ToString('o'))-le[datetimeoffset]::UtcNow){throw 'Timezone expiry check failed'}}
- [pscustomobject]@{ok=$true;checks=@('syntax','atomic-checkpoint','duplicate-call-blocked','lost-response-checkpoint','uncertain-write-not-replayed','audit-read-only','timezone-expiry');databaseCalls=0}|ConvertTo-Json -Compress
+ [pscustomobject]@{ok=$true;checks=@('syntax','atomic-checkpoint','duplicate-call-blocked','lost-response-checkpoint','uncertain-write-not-replayed','audit-read-only','timezone-expiry','canonical-payload');databaseCalls=0}|ConvertTo-Json -Compress
 }finally{Remove-Item -LiteralPath $dir -Recurse -Force}

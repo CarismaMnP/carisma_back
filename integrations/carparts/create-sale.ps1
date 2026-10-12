@@ -12,6 +12,12 @@ function Q([string]$sql,[object[]]$values=@()) {
  $rd=$q.ExecuteReader();$rows=New-Object 'System.Collections.Generic.List[object]'
  try{while($rd.Read()){$r=[ordered]@{};for($i=0;$i-lt$rd.FieldCount;$i++){$v=$rd.GetValue($i);if($v-is[DBNull]){$v=$null};$r[$rd.GetName($i)]=$v};$rows.Add([pscustomobject]$r)}}finally{$rd.Close();$q.Dispose()};return $rows.ToArray()
 }
+function Canonical($value) {
+ if($null-eq$value){return $null}
+ if($value-is[pscustomobject]){$out=[ordered]@{};foreach($p in @($value.PSObject.Properties|Sort-Object Name)){$out[$p.Name]=Canonical $p.Value};return $out}
+ if($value-is[array]){$list=New-Object 'Collections.Generic.List[object]';foreach($v in $value){$list.Add((Canonical $v))};return ,$list.ToArray()}
+ return $value
+}
 function Save {
  $bytes=[Text.Encoding]::UTF8.GetBytes(($state|ConvertTo-Json -Depth 15 -Compress))
  $tmp=$statePath+'.tmp'
@@ -38,9 +44,10 @@ function Native([string]$key,[string]$method,$fields) {
  if(!$r.Count -or [string]::IsNullOrWhiteSpace([string]$r[0].Result) -or [string]$r[0].Result-match'^(ERROR|FAIL)'){throw ('Native '+$method+' rejected; inspect checkpoint')}
 }
 function Headers {return @(Q 'SELECT WONum,WOStatus,Finalized,InvoiceNum,CustomerBillTo,Email,PO,AmountPaid,MethodOfPayment,PartsSubtotal,Tax,TotalPrice,Freight FROM SQLUser.WOSummary WHERE Yard=9032 AND PO=?' @($po))}
+function EmailAddress($value) {return (([string]$value)-replace '^mailto:','').Trim()}
 function Header {
  $hs=@(Headers);if($hs.Count-ne1){throw 'Expected one work order for website reference'}
- if([string]$hs[0].WONum-ne[string]$state.wo -or [string]$hs[0].CustomerBillTo-ne$customerName -or [string]$hs[0].Email-ine$customerEmail){throw 'Work order customer or reference changed'}
+ if([string]$hs[0].WONum-ne[string]$state.wo -or [string]$hs[0].CustomerBillTo-ne$customerName -or (EmailAddress $hs[0].Email)-ine$customerEmail){throw 'Work order customer or reference changed'}
  return $hs[0]
 }
 function Details {return @(Q 'SELECT WONum,ItemNum,GUID,Tag,NetAmount,Subtotal,Taxed,LineItemType FROM SQLUser.WODetail WHERE Yard=9032 AND WONum=?' @([string]$state.wo))}
@@ -65,7 +72,7 @@ function VerifyDetails([switch]$Complete) {
   if($ls.Count-ne1 -or $d.Tag-ne$ls[0].tag -or $d.LineItemType-ne'Regular sale' -or
      [decimal]$d.NetAmount-ne([decimal]$ls[0].priceCents/100) -or $d.Taxed-ne'No'){throw 'Unexpected sale line, amount or tax'}
  }
- if(@($ds.GUID|Select-Object -Unique).Count-ne$ds.Count){throw 'Duplicate sale line'}
+ if(@($ds|ForEach-Object{[string]$_.GUID}|Select-Object -Unique).Count-ne$ds.Count){throw 'Duplicate sale line'}
 }
 function VerifyPayment($h) {
  if($h.Finalized-ne'Yes' -or $h.MethodOfPayment-ne'PrePaid' -or [decimal]$h.Tax-ne0 -or
@@ -103,10 +110,14 @@ try {
  if(!$locked){throw 'Sale bridge busy; retry later'}
  $statePath=Join-Path (Join-Path $PSScriptRoot 'sales') ($id+'.json')
  $sha=[Security.Cryptography.SHA256]::Create()
- try{$fingerprint=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($Request|Select-Object -Property * -ExcludeProperty action|ConvertTo-Json -Depth 15 -Compress)))).Replace('-','')}finally{$sha.Dispose()}
+ try{
+  $body=$Request|Select-Object -Property * -ExcludeProperty action
+  $legacyFingerprint=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($body|ConvertTo-Json -Depth 15 -Compress)))).Replace('-','')
+  $fingerprint=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(((Canonical $body)|ConvertTo-Json -Depth 15 -Compress)))).Replace('-','')
+ }finally{$sha.Dispose()}
  $state=[pscustomobject]@{version=1;orderId=$id;fingerprint=$fingerprint;wo=$null;invoice=$null;attempts=@()}
  if(Test-Path -LiteralPath $statePath){$state=Get-Content -Raw -LiteralPath $statePath|ConvertFrom-Json
-  if($state.orderId-ne$id -or $state.fingerprint-ne$fingerprint){throw 'Immutable sale payload differs from checkpoint'}
+  if($state.orderId-ne$id -or ($state.fingerprint-ne$fingerprint -and $state.fingerprint-ne$legacyFingerprint)){throw 'Immutable sale payload differs from checkpoint'}
  }
  $c.Open()
  foreach($method in @('WOCreate','WOAddPart','FinalizeWO','PostInvoice')) {
