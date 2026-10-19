@@ -8,7 +8,8 @@
     "start:verbose": "NODE_ENV=production npx sequelize-cli db:migrate --env production && NODE_ENV=production node index.js",
     "test": "jest",
     "carparts:worker": "NODE_ENV=production node integrations/carparts/worker.js",
-    "test:carparts": "jest --runInBand __tests__/carparts"
+    "test:carparts": "jest --runInBand __tests__/carparts",
+    "test:checkout": "jest --runInBand __tests__/carparts __tests__/freight"
   },
   "keywords": [],
   "author": "",

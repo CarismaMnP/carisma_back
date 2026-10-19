@@ -406,7 +406,7 @@ suite('CarParts transactional integration', () => {
     await catalog.syncCatalog({snapshot:snapshot([row(),row(g2)])});
     const ps=await models.Product.findAll({order:[['id','ASC']]});
     const manual=await models.Product.create({name:'Manual',link:'manual',images:[],source:'manual',count:3,price:7});
-    const {order}=await orders.reserveOrder({userId:1,fullName:'Buyer',mail:'test@example.invalid',products:[...ps.map(p=>({productId:p.id,count:1})),{productId:manual.id,count:2}]});
+    const {order}=await orders.reserveOrder({userId:1,delivey_type:'pickup',fullName:'Buyer',mail:'test@example.invalid',products:[...ps.map(p=>({productId:p.id,count:1})),{productId:manual.id,count:2}]});
     await orders.confirmPayment(order.id,{paidLive:true,updates:{tax:4.8,total:68.8,billingAddress:{line1:'Invoice street'},shippingAddress:{line1:'Delivery street'}}});
     await ps[0].update({price:999});
     const bridge=require('../../integrations/carparts/transport').bridge;
@@ -440,7 +440,7 @@ suite('CarParts transactional integration', () => {
     const testId=require('crypto').randomUUID();
     await expect(orders.reserveOrder({products:[{productId:p.id,count:1}]},{authorizedTestId:testId})).rejects.toThrow('authorized');
     process.env.CARPARTS_TEST_ORDER_ID=testId;
-    const {order}=await orders.reserveOrder({userId:1,fullName:'TEST',mail:'test@example.invalid',products:[{productId:p.id,count:1}]},{authorizedTestId:testId});
+    const {order}=await orders.reserveOrder({userId:1,delivey_type:'pickup',fullName:'TEST',mail:'test@example.invalid',products:[{productId:p.id,count:1}]},{authorizedTestId:testId});
     await orders.confirmPayment(order.id,{paidLive:false});
     const {processSales}=require('../../integrations/carparts/sales');expect((await processSales()).processed).toBe(0);
     expect((await models.CarpartsJob.findOne()).state).toBe('pending');

@@ -67,3 +67,17 @@ test.each([
   ).rejects.toThrow('does not match');
   expect(confirmPayment).not.toHaveBeenCalled();
 });
+
+test('freight confirmation keeps the fixed shipping address and records paid shipping',async()=>{
+ const freightAddress={line1:'1 Test St',city:'Winter Garden',state:'FL',postal_code:'34787',country:'US'};
+ Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',delivey_type:'freight',freightQuoteId:'q',stripeCustomerId:'cus',shippingExpectedCents:22961,freightAddress});
+ stripe.getCheckoutSession.mockResolvedValue({...session,metadata:{orderId:'order',freightQuoteId:'q'},customer:'cus',amount_total:25461,total_details:{amount_shipping:22961,amount_tax:0},customer_details:{address:{postal_code:'10001'}}});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ expect(confirmPayment).toHaveBeenCalledWith('order',expect.objectContaining({updates:expect.objectContaining({shippingAddress:freightAddress,shippingAmount:229.61})}));
+ expect(confirmPayment.mock.calls[0][1].updates.shippingReview).toBeUndefined();
+});
+test('a paid shipping discrepancy is recorded for review while preventing resale',async()=>{
+ Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',shippingExpectedCents:22961});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ expect(confirmPayment).toHaveBeenCalledWith('order',expect.objectContaining({updates:expect.objectContaining({shippingReview:expect.any(String)})}));
+});

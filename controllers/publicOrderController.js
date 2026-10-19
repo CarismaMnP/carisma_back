@@ -6,13 +6,14 @@ class OrderController {
   async create(req, res, next) {
     let reserved, session;
     try {
-      const { fullName, mail, phone, delivey_type, products } = req.body;
+      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress } = req.body;
       const userId = req.user?.id;
       if (!userId || !fullName || !phone || !mail || !Array.isArray(products) || !products.length)
         return res.status(400).json({ error: 'Please fill in the order form' });
       const user = await User.findByPk(userId);
       if (!user) return res.status(400).json({ error: 'User not found. Please authorize' });
-      reserved = await reserveOrder({ userId, fullName, mail, phone, delivey_type, products });
+      reserved = await reserveOrder({ userId, fullName, mail, phone, delivey_type, products,
+        freightQuoteId, freightDestination, freightAddress });
       const { order, items } = reserved;
       const lineItems = items.map(item => {
         const product = reserved.products.find(p => p.id === item.productId);
@@ -35,14 +36,18 @@ class OrderController {
         customerEmail: mail,
         lineItems,
         collectShippingAddress: delivey_type === 'ups',
+        freight: order.freightQuoteId ? {quoteId:order.freightQuoteId,amountCents:order.shippingExpectedCents,
+          address:order.freightAddress,name:order.fullName,phone:order.phone} : null,
       });
       await order.update({
         checkoutSessionId: session.sessionId,
         stripePaymentIntentId: session.paymentIntentId || null,
+        stripeCustomerId: session.customerId || null,
       });
       return res.json({
         invoiceId: order.id,
         amount: order.sum,
+        shippingAmount: Number(order.shippingAmount),
         currency: 'USD',
         paymentUrl: session.url,
         stripeSessionId: session.sessionId,

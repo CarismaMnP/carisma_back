@@ -37,7 +37,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * @param {boolean} params.collectShippingAddress - Whether Stripe Checkout should collect shipping address
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight }) {
   try {
     const sessionConfig = {
       payment_method_types: ['card'],
@@ -82,15 +82,39 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       ];
     }
 
+    let customerId=null;
+    if (freight) {
+      if (!Number.isSafeInteger(freight.amountCents) || freight.amountCents<=0 || !freight.address?.postal_code)
+        throw Error('A valid freight quote and delivery address are required');
+      // Hosted Checkout cannot rerate on address changes. For freight only, collect
+      // the full delivery address on our site, then use an order-specific Customer
+      // shipping address without an editable Stripe shipping-address form.
+      const customer=await stripe.customers.create({name:freight.name,email:customerEmail,phone:freight.phone,
+        shipping:{name:freight.name,phone:freight.phone,address:freight.address},metadata:{orderId}},
+        {idempotencyKey:`checkout-customer:${orderId}`});
+      customerId=customer.id;
+      delete sessionConfig.customer_email;
+      delete sessionConfig.shipping_address_collection;
+      sessionConfig.customer=customerId;
+      sessionConfig.adaptive_pricing={enabled:false};
+      sessionConfig.metadata.freightQuoteId=freight.quoteId;
+      sessionConfig.payment_intent_data.metadata.freightQuoteId=freight.quoteId;
+      sessionConfig.shipping_options=[{shipping_rate_data:{type:'fixed_amount',
+        fixed_amount:{amount:freight.amountCents,currency:'usd'},display_name:'Freight delivery · lift-gate & insurance',
+        tax_behavior:'exclusive',tax_code:'txcd_92010001'}}];
+      const a=freight.address;
+      sessionConfig.custom_text={submit:{message:`Freight delivery to ${[a.line1,a.line2,a.city,a.state,a.postal_code].filter(Boolean).join(', ')}. To change the delivery address, return to Carisma before paying.`.slice(0,1200)}};
+    }
     const session = await stripe.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
 
     return {
       url: session.url,
       sessionId: session.id,
       paymentIntentId: session.payment_intent,
+      customerId,
     };
   } catch (error) {
-    console.error('Error creating Stripe checkout session:', error);
+    console.error('Error creating Stripe checkout session:', error.type || 'checkout_error');
     throw error;
   }
 }

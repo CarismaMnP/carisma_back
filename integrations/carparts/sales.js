@@ -29,7 +29,7 @@ async function processSales({ testOrderId } = {}) {
       }
       const products = await Product.findAll({where: {id: {[Op.in]: group.map(j => j.productId)}}});
       const testAllowed = testOrderId === orderId && order.isIntegrationTest && !order.paidLive;
-      if ((!order.paidLive && !testAllowed) || !order.stockAppliedAt || !order.paidAt ||
+      if (order.shippingReview || (!order.paidLive && !testAllowed) || !order.stockAppliedAt || !order.paidAt ||
           new Date(order.createdAt).getTime() < after || new Date(order.paidAt).getTime() < after ||
           !['confirmed','delivery','delivered','completed'].includes(order.state) ||
           group.some(j => !products.some(p => p.id === j.productId && p.source === 'carparts' &&

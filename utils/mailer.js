@@ -69,7 +69,7 @@ async function sendVerificationCode(email, code) {
  * @param {number} params.total - Total amount
  * @param {Object} params.shippingAddress - Shipping address (optional)
  */
-async function sendOrderConfirmation({ email, orderId, fullName, products, subtotal, tax, total, shippingAddress }) {
+async function sendOrderConfirmation({ email, orderId, fullName, products, subtotal, tax, total, shipping = 0, shippingAddress }) {
   const productRows = products.map(p => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">${p.name}</td>
@@ -121,6 +121,7 @@ async function sendOrderConfirmation({ email, orderId, fullName, products, subto
 
         <div style="margin-top: 20px; text-align: right;">
           <p style="margin: 5px 0;"><strong>Subtotal:</strong> $${subtotal.toFixed(2)}</p>
+          <p style="margin: 5px 0;"><strong>Shipping:</strong> $${Number(shipping).toFixed(2)}</p>
           <p style="margin: 5px 0;"><strong>Tax:</strong> $${tax.toFixed(2)}</p>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Total:</strong> $${total.toFixed(2)}</p>
         </div>
@@ -143,7 +144,7 @@ async function sendOrderConfirmation({ email, orderId, fullName, products, subto
   }
 }
 
-async function sendOrderNotification({ email, orderId, fullName, products, subtotal, tax, total, shippingAddress }) {
+async function sendOrderNotification({ email, orderId, fullName, products, subtotal, tax, total, shipping = 0, shippingAddress }) {
   const productRows = products.map(p => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #eee;">${p.name}</td>
@@ -192,6 +193,7 @@ async function sendOrderNotification({ email, orderId, fullName, products, subto
 
         <div style="margin-top: 20px; text-align: right;">
           <p style="margin: 5px 0;"><strong>Subtotal:</strong> $${subtotal.toFixed(2)}</p>
+          <p style="margin: 5px 0;"><strong>Shipping:</strong> $${Number(shipping).toFixed(2)}</p>
           <p style="margin: 5px 0;"><strong>Tax:</strong> $${tax.toFixed(2)}</p>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Total:</strong> $${total.toFixed(2)}</p>
         </div>

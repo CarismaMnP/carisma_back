@@ -63,7 +63,7 @@ class ProductController {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
         region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
-        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make, freightCategoryCode,
       } = JSON.parse(req.body.data);
 
       let filesPromises = []
@@ -124,6 +124,7 @@ class ProductController {
         recipe: recipeJSON,
         additionalFields: additionalFieldsJSON,
         selector: selectorJSON,
+        freightCategoryCode: require('../integrations/freight/profiles').validateManualCode(freightCategoryCode),
         ebayCategory: ebayCategory || null,
         ebayModel: ebayModel || null,
         ebayYear: ebayYear || null,
@@ -165,7 +166,7 @@ class ProductController {
         name, description, link, price, old_price, categoryId,
         about, weight, variation, processing, fermentation,
         region, farmer, keyDescriptor, brightness, recipe, additionalFields, selector,
-        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make,
+        ebayCategory, ebayModel, count, ebayYear, ebayAdditionalNotes, ebayAlsoFits, make, freightCategoryCode,
       } = JSON.parse(req.body.data);
 
 
@@ -225,6 +226,7 @@ class ProductController {
         recipe: recipeJSON,
         additionalFields: additionalFieldsJSON,
         selector: selectorJSON,
+        ...(freightCategoryCode !== undefined ? {freightCategoryCode: require('../integrations/freight/profiles').validateManualCode(freightCategoryCode)} : {}),
         ebayCategory: ebayCategory || null,
         ebayModel: ebayModel || null,
         ebayYear: ebayYear || null,

@@ -103,9 +103,11 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
       if (p.source === 'carparts' && n !== 1) throw Error('This part is a single inventory item');
       sum += Math.round(p.price * 100) * n;
     }
+    const shipping = await require('../freight/service').checkoutShipping(data, products, items, transaction);
     const now = new Date();
     const order = await Order.create(
       {
+        ...shipping,
         userId: data.userId,
         fullName: data.fullName,
         mail: data.mail,

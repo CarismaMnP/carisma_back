@@ -11,6 +11,9 @@ const arrivalRouter = require('./arrivalRouter');
 const recipeRouter = require('./recipeRouter');
 const promotionRouter = require('./promotionRouter');
 const requestRouter = require('./requestRouter');
+const freight=require('../../controllers/freightController');
+router.get('/freight/quotes',checkRole('ADMINISTRATOR'),freight.list);
+router.get('/freight/profiles',checkRole('ADMINISTRATOR'),freight.profiles);
 
 router.get('/carparts/status', checkRole('ADMINISTRATOR'), async (req,res,next)=>{try{res.json(await require('../../integrations/carparts/status').getStatus());}catch(e){next(e)}});
 router.use('/user', usersRouter);

@@ -104,13 +104,22 @@ class StripeWebhookController {
       (order.checkoutSessionId && order.checkoutSessionId !== full.id)
     )
       throw Error('Payment does not match the checkout order');
+    // Only new orders carry an expected shipping amount; legacy payments keep
+    // their original reconciliation behavior. A paid discrepancy is held for review.
+    let shippingReview=null;
+    if (order.shippingExpectedCents != null && Number(full.total_details?.amount_shipping || 0)!==order.shippingExpectedCents)
+      shippingReview='The paid shipping amount does not match the checkout quote';
+    if (order.freightQuoteId && (full.metadata?.freightQuoteId!==order.freightQuoteId ||
+      (order.stripeCustomerId && full.customer!==order.stripeCustomerId)))
+      shippingReview='The paid freight reference does not match the checkout order';
     const updates = {
       checkoutSessionId: full.id,
       tax: (full.total_details?.amount_tax || 0) / 100,
       total: (full.amount_total || 0) / 100,
       shippingAmount: (full.total_details?.amount_shipping || 0) / 100,
       billingAddress: full.customer_details?.address || null,
-      shippingAddress: full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
+      shippingAddress: order.freightAddress || full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
+      ...(shippingReview ? {shippingReview} : {}),
     };
     if (order.delivey_type === 'ups')
       Object.assign(updates, this.extractShippingAddressFromCheckoutSession(full) || {});
@@ -136,11 +145,11 @@ class StripeWebhookController {
       const products = orderProducts.map(op => ({
         name: op.product.name,
         count: op.count,
-        price: op.product.price,
+        price: op.unitPriceCents != null ? op.unitPriceCents/100 : op.product.price,
       }));
 
       const shippingAddress =
-        order.delivey_type === 'ups' && order.address_line_1
+        ['ups','freight'].includes(order.delivey_type) && order.address_line_1
           ? {
               name: order.fullName,
               line1: order.address_line_1,
@@ -158,6 +167,7 @@ class StripeWebhookController {
         fullName: order.fullName,
         products,
         subtotal: order.sum,
+        shipping: Number(order.shippingAmount || 0),
         tax: order.tax || 0,
         total: order.total || order.sum,
         shippingAddress,
@@ -169,6 +179,7 @@ class StripeWebhookController {
         fullName: order.fullName,
         products,
         subtotal: order.sum,
+        shipping: Number(order.shippingAmount || 0),
         tax: order.tax || 0,
         total: order.total || order.sum,
         shippingAddress,

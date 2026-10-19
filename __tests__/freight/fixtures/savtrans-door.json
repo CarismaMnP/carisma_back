@@ -1,0 +1,275 @@
+{
+  "pickup_postal": "32209",
+  "delivery_postal": "34787",
+  "total_miles": 170,
+  "insured_value": "700.00",
+  "insured_charge": "12.60",
+  "bol_num": null,
+  "contract_charge_types": [
+    {
+      "name": "Lift-gate Delivery",
+      "description": "If the location does not have a loading dock or requires a truck with a lift gate, additional fees will apply.",
+      "is_pickup": false,
+      "is_default": false,
+      "id": 4
+    }
+  ],
+  "is_complete": false,
+  "items": [
+    {
+      "weight": 165,
+      "pallets": 1,
+      "pieces": 1,
+      "class": "150",
+      "length": 60,
+      "width": 40,
+      "height": 55,
+      "is_hazmat": false,
+      "description": "Door / Decklid / Tailgate (Packaged)",
+      "nmfc": "18520-2"
+    }
+  ],
+  "rate_results": [
+    {
+      "total_charge": "229.61",
+      "transit_time": 2,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "AAA Cooper",
+          "code": "AACT",
+          "url": "https://www.aaacooper.com",
+          "id": 30
+        },
+        "name": "AAA Cooper",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "3f61fa7d07b9808"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "269.08",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "Estes",
+          "code": "EXLA",
+          "url": "https://www.estes-express.com",
+          "id": 20
+        },
+        "name": "Estes",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "aa526e446a15df3"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "296.96",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "XPO Logistics",
+          "code": "CNWY",
+          "url": "https://www.xpo.com/solutions/transportation/less-than-truckload-ltl",
+          "id": 18
+        },
+        "name": "XPO Logistics",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "3172ee9e95a887a"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "302.30",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "Southeastern",
+          "code": "SEFL",
+          "url": "https://www.sefl.com",
+          "id": 22
+        },
+        "name": "Southeastern",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "d1e4a5ef414a1b9"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "303.33",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "R &amp; L Carriers Inc",
+          "code": "RLCA",
+          "url": "https://www.rlcarriers.com/",
+          "id": 88
+        },
+        "name": "R+L Carriers",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "1c408a45a1cfb39"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "311.80",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "AAA Cooper",
+          "code": "AACT",
+          "url": "https://www.aaacooper.com",
+          "id": 30
+        },
+        "name": "AAA Cooper",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "cda1faaf065f7af"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "315.65",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "XPO Logistics",
+          "code": "CNWY",
+          "url": "https://www.xpo.com/solutions/transportation/less-than-truckload-ltl",
+          "id": 18
+        },
+        "name": "XPO Logistics",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "fb24627582e370c"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "340.00",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "TForce Freight",
+          "code": "UPGF",
+          "url": "https://www.tforcefreight.com/",
+          "id": 69
+        },
+        "name": "TForce Freight",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "6d9633aa0e418f5"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "406.93",
+      "transit_time": 2,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "ABF",
+          "code": "ABFS",
+          "url": "https://arcb.com/abf-freight",
+          "id": 64
+        },
+        "name": "ABF (LTL)",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "8584852869cadce"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "420.51",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "Saia",
+          "code": "SAIA",
+          "url": "https://www.saia.com/",
+          "id": 7
+        },
+        "name": "Saia",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "3d35a5e03ba5df3"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "479.55",
+      "transit_time": 1,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "Old Dominion Freight",
+          "code": "ODFL",
+          "url": "https://www.odfl.com/",
+          "id": 61
+        },
+        "name": "Old Dominion",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "f8a3dd5ea7d8b06"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    },
+    {
+      "total_charge": "561.46",
+      "transit_time": 2,
+      "transit_time_max": null,
+      "contract": {
+        "carrier": {
+          "name": "ABF",
+          "code": "ABFS",
+          "url": "https://arcb.com/abf-freight",
+          "id": 64
+        },
+        "name": "ABF (LTL)",
+        "description": null,
+        "is_guaranteed": 0,
+        "is_csp": false,
+        "hash": "b555cc9f39f80b4"
+      },
+      "is_dispatched": false,
+      "rate_dispatch": null
+    }
+  ],
+  "rest_uri": "https://vsa.savtrans.com/api.php/rest/rate_request/f6a5d59334c7ecd43f0f.json"
+}

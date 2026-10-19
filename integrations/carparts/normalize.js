@@ -95,6 +95,7 @@ function normalize(row, { parts, vehicles, images, links }) {
     aspects,
   };
   const fields = {
+    carpartsPartCode: text(row.Part).toUpperCase(),
     name: title,
     description: text(row.Description),
     price: Number(row.PriceRetail) || 0,
