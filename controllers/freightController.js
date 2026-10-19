@@ -1,13 +1,18 @@
+const checkout=require('../integrations/carparts/checkout');
 const service=require('../integrations/freight/service');
 const {profiles}=require('../integrations/freight/profiles');
 const {FreightQuote}=require('../models/models');
 const {Op}=require('sequelize');
 const handle=fn=>async(req,res)=>{
   try {res.json(await fn(req));}
-  catch(error) {res.status(400).json({message:error.message || 'Freight calculation unavailable'});}
+  catch(error) {res.status(error.status || 400).json({message:error.message || 'Freight calculation unavailable'});}
 };
 module.exports={
-  requirements:handle(req=>service.requirements(req.body.products)),
+  requirements:handle(req=>checkout.withCheckoutLock(req.user.id,async()=>{
+    const existing=await checkout.matchingOrder(req.user.id,req.body.products);
+    if(existing) return {pendingOrder:checkout.summary(existing.order,existing.payment)};
+    return service.requirements(req.body.products);
+  })),
   quote:handle(req=>service.createQuote(Number(req.user.id),req.body)),
   profiles:handle(()=>profiles),
   list:handle(async req=>{

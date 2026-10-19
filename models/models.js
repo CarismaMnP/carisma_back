@@ -125,6 +125,7 @@ const Order = sequelize.define('order', {
   delivery_instructions: { type: DataTypes.STRING, allowNull: true },
   stripePaymentIntentId: { type: DataTypes.STRING, allowNull: true },
   checkoutSessionId: DataTypes.STRING,
+  checkoutExpiresAt: DataTypes.DATE,
   stockReservedAt: DataTypes.DATE,
   reservationExpiresAt: DataTypes.DATE,
   stockReleasedAt: DataTypes.DATE,

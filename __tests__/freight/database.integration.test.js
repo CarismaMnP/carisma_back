@@ -1,3 +1,4 @@
+jest.mock('../../integrations/freight/addresses',()=>({lookupZip:jest.fn(async()=>({places:[{city:'Winter Garden',state:'FL'}]}))}));
 jest.mock('../../integrations/carparts/transport',()=>({bridge:jest.fn(()=>{throw Error('No live Checkmate writes in freight tests');})}));
 jest.mock('../../integrations/freight/savtrans',()=>({calculate:jest.fn(async()=>({reference:'abc',insuranceCents:1260,rates:[{carrier:'Test Carrier',amountCents:22961}],selected:{carrier:'Test Carrier',amountCents:22961}}))}));
 const suite=process.env.CARPARTS_TEST_DB==='true'?describe:describe.skip;
@@ -53,7 +54,7 @@ suite('freight checkout transactions',()=>{
   const {order}=await orders.reserveOrder({...orderData(),products:[{productId:small.id,count:1}],delivey_type:'ups'});
   expect(order.sum).toBe(10);expect(order.shippingExpectedCents).toBe(0);expect(order.freightQuoteId).toBeFalsy();
  });
- test.each(['owner','expiry','price','quantity','zip','addressType','access','address'])('rejects changed quote: %s',async change=>{
+ test.each(['owner','expiry','price','quantity','zip','addressType','access','address','state'])('rejects changed quote: %s',async change=>{
   const q=await quote(), data={...orderData(),freightQuoteId:q.id};
   if(change==='owner')data.userId=2;
   if(change==='expiry')await m.FreightQuote.update({expiresAt:new Date(0)},{where:{id:q.id}});
@@ -62,6 +63,7 @@ suite('freight checkout transactions',()=>{
   if(change==='zip')data.freightDestination={...dest,zip:'10001'};
   if(change==='addressType')data.freightDestination={...dest,addressType:'business'};
   if(change==='access')data.freightDestination={...dest,limitedAccess:true};
+  if(change==='state')data.freightAddress={...addr,state:'NY'};
   if(change==='address')data.freightAddress={...addr,postal_code:'10001'};
   await expect(orders.reserveOrder(data)).rejects.toThrow();expect(await m.Order.count()).toBe(0);expect((await big.reload()).count).toBe(2);
  });

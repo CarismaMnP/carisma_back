@@ -118,6 +118,9 @@ async function checkoutShipping(data,products,items,transaction) {
   const request=buildRequest(rows,data.freightDestination);
   if (fingerprint(request)!==q.fingerprint) throw Error('Your cart or delivery details changed. Please calculate freight again.');
   const address=shippingAddress(data.freightAddress,request.zip);
+  const location=await require('./addresses').lookupZip(request.zip);
+  if(location.places.length&&!location.places.some(x=>x.state===address.state))
+    throw Error('The delivery state does not match the quoted ZIP code');
   if (!Number.isSafeInteger(q.amountCents) || q.amountCents<=0) throw Error('Invalid freight quote');
   return {freightQuoteId:q.id,freightSnapshot:{request:q.request,result:q.result,quotedAt:q.createdAt,expiresAt:q.expiresAt},
     freightAddress:address,shippingAddress:address,shippingExpectedCents:q.amountCents,shippingAmount:q.amountCents/100,

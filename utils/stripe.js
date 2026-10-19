@@ -109,6 +109,7 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
 
     return {
       url: session.url,
+      expiresAt: session.expires_at ? new Date(session.expires_at*1000) : null,
       sessionId: session.id,
       paymentIntentId: session.payment_intent,
       customerId,
