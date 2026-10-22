@@ -87,7 +87,7 @@ function VerifyPayment($h) {
 }
 function VerifyEditable($h) {
  if($h.Finalized-eq'Yes' -or [long]$h.InvoiceNum-gt0 -or $h.WOType-ne'WK' -or
-    $h.WOStatus-notin@('Not Printed','Printed')){throw 'Work order is no longer editable; manager review required'}
+    ([string]$h.WOStatus).Trim()-notin@('','Not Printed','Printed')){throw 'Work order is no longer editable; manager review required'}
 }
 function CompletedHandoff {
  if(!$state.handoff){return $null}

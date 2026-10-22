@@ -40,6 +40,11 @@ try {
  $AuditOnly=$false;$id='test';$totalCents=1994;$total=[decimal]19.94;$fingerprint='test';$state.wo='2500'
  $lines=@([pscustomobject]@{guid='one'},[pscustomobject]@{guid='two'})
  $script:header=[pscustomobject]@{WOType='WK';WOStatus='Not Printed';Finalized=$null;InvoiceNum=0;Tax=0;Freight=0;PartsSubtotal=19.94;TotalPrice=19.94}
+ # WOCreate uses a NULL status for an editable, never-printed work order.
+ foreach($status in @($null,'','Not Printed','Printed')){$script:header.WOStatus=$status;VerifyEditable $script:header}
+ $script:header.WOStatus='Cancelled';$blocked=$false;try{VerifyEditable $script:header}catch{$blocked=$true}
+ if(!$blocked){throw 'Cancelled work order was accepted'}
+ $script:header.WOStatus=$null
  $script:inventoryStatus='W';$script:assignedWO='2500';$script:detailsComplete=$true
  function Header {return $script:header}
  function VerifyDetails([switch]$Complete){if(!$Complete -or !$script:detailsComplete){throw 'Line count mismatch'}}
