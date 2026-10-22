@@ -5,6 +5,7 @@ const { bridge } = require('./transport');
 const { withLock } = require('./lock');
 const { releaseReservation } = require('./orders');
 const { salePayload } = require('./sale-payload');
+const { validHandoff } = require('./handoff');
 async function processSales({ testOrderId } = {}) {
   if (process.env.CARPARTS_SALES_ENABLED !== 'true') return { disabled: true };
   if (testOrderId && process.env.CARPARTS_TEST_ORDER_ID !== testOrderId)
@@ -51,17 +52,15 @@ async function processSales({ testOrderId } = {}) {
       processed += group.length;
       try {
         const result = await bridge(order.checkmatePayload, {timeout: 240000});
-        if (result.ok && ['posted','already_posted'].includes(result.state) && result.invoice && result.workOrder &&
-            result.orderId === orderId && result.taxCents === 0 &&
-            result.subtotalCents === order.checkmatePayload.lines.reduce((n,l) => n + l.priceCents, 0)) {
+        if (validHandoff(result, order.checkmatePayload)) {
           await sequelize.transaction(async transaction => {
-            await order.update({checkmateWorkOrder: String(result.workOrder), checkmateInvoice: String(result.invoice)}, {transaction});
+            await order.update({checkmateWorkOrder: String(result.workOrder), checkmateInvoice: result.invoice ? String(result.invoice) : null}, {transaction});
             await CarpartsJob.update({state:'succeeded', result, lastError:null}, {where:{orderId}, transaction});
             await Product.update({count:0, sourceCount:0, sourceMissing:false},
               {where:{id:{[Op.in]:group.map(j => j.productId)}}, transaction});
           });
         } else await CarpartsJob.update({state:'review', result,
-          lastError: `Checkmate requires review: ${result.error || result.state || 'Invalid invoice result'}`}, {where:{orderId}});
+          lastError: `Checkmate requires review: ${result.error || result.state || 'Invalid work-order result'}`}, {where:{orderId}});
       } catch (e) {
         // Retry the same immutable request. Windows reconciles durable checkpoints before any write.
         await CarpartsJob.update({state:'retry', lastError:e.message.slice(0,2000),
@@ -79,6 +78,7 @@ async function reconcileReservations() {
       stockReservedAt: { [Op.ne]: null },
       stockAppliedAt: null,
       stockReleasedAt: null,
+      isIntegrationTest: false,
       reservationExpiresAt: { [Op.lt]: new Date() },
     },
     limit: 30,
@@ -112,4 +112,4 @@ async function reconcileReservations() {
     else if (session.status === 'expired') await releaseReservation(order.id, 'expired');
   }
 }
-module.exports = { processSales, reconcileReservations };
+module.exports = { processSales, reconcileReservations, validHandoff };

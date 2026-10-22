@@ -11,6 +11,7 @@ const {
 const { bridge } = require('./transport');
 const { availability } = require('./normalize');
 const { fillMissingCustomerName } = require('../../utils/customerName');
+const { authorizedIntegrationTest } = require('../../utils/stripeTest');
 function orderItems(input) {
   if (!Array.isArray(input) || !input.length || input.length > 100)
     throw Error('Invalid order items');
@@ -173,7 +174,7 @@ async function confirmPayment(
   return sequelize.transaction(async transaction => {
     const order = await Order.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
     if (!order) throw Error('Paid order not found');
-    const testAuthorized = order.isIntegrationTest && process.env.CARPARTS_TEST_ORDER_ID === order.id;
+    const testAuthorized = order.isIntegrationTest && authorizedIntegrationTest(order.id);
     if (order.isIntegrationTest && (!testAuthorized || paidLive))
       throw Error('Integration test must be explicitly authorized and cannot claim a live payment');
     // Multiple Stripe event types and webhook retries must share one atomic stock operation.

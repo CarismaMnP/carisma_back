@@ -26,6 +26,15 @@
 const Stripe = require('stripe');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const {testConfig, authorizedStripeTest} = require('./stripeTest');
+function stripeForOrder(orderId, livemode = true) {
+  if (livemode !== false) return stripe;
+  if (!authorizedStripeTest(orderId)) {
+    if (process.env.NODE_ENV !== 'production') return stripe;
+    throw Error('Stripe test order is not authorized');
+  }
+  return new Stripe(testConfig().secretKey);
+}
 
 /**
  * Create a Stripe Checkout Session for payment
@@ -37,8 +46,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
  * @param {boolean} params.collectShippingAddress - Whether Stripe Checkout should collect shipping address
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight, authorizedTestId }) {
   try {
+    if (authorizedTestId && (authorizedTestId !== orderId || !authorizedStripeTest(orderId)))
+      throw Error('Stripe test checkout is not authorized');
+    const client = authorizedTestId ? stripeForOrder(orderId, false) : stripe;
     const sessionConfig = {
       payment_method_types: ['card'],
       line_items: lineItems,
@@ -89,7 +101,7 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       // Hosted Checkout cannot rerate on address changes. For freight only, collect
       // the full delivery address on our site, then use an order-specific Customer
       // shipping address without an editable Stripe shipping-address form.
-      const customer=await stripe.customers.create({name:freight.name,email:customerEmail,phone:freight.phone,
+      const customer=await client.customers.create({name:freight.name,email:customerEmail,phone:freight.phone,
         shipping:{name:freight.name,phone:freight.phone,address:freight.address},metadata:{orderId}},
         {idempotencyKey:`checkout-customer:${orderId}`});
       customerId=customer.id;
@@ -105,7 +117,7 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       const a=freight.address;
       sessionConfig.custom_text={submit:{message:`Freight delivery to ${[a.line1,a.line2,a.city,a.state,a.postal_code].filter(Boolean).join(', ')}. To change the delivery address, return to Carisma before paying.`.slice(0,1200)}};
     }
-    const session = await stripe.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
+    const session = await client.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
 
     return {
       url: session.url,
@@ -135,7 +147,12 @@ function verifyWebhookSignature(payload, signature) {
     );
     return event;
   } catch (error) {
-    console.error('Error verifying webhook signature:', error);
+    const config=testConfig();
+    if (config) {
+      const testEvent=stripe.webhooks.constructEvent(payload, signature, config.webhookSecret);
+      if (testEvent.livemode !== false) throw Error('Test signature cannot authorize live events');
+      return testEvent;
+    }
     throw error;
   }
 }
@@ -160,9 +177,9 @@ async function getPaymentIntent(paymentIntentId) {
  * @param {string} sessionId - Checkout session ID
  * @returns {Promise<Object>} - Checkout session object
  */
-async function getCheckoutSession(sessionId) {
+async function getCheckoutSession(sessionId, {orderId, livemode = true} = {}) {
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripeForOrder(orderId, livemode).checkout.sessions.retrieve(sessionId);
     return session;
   } catch (error) {
     console.error('Error retrieving checkout session:', error);
@@ -176,4 +193,5 @@ module.exports = {
   verifyWebhookSignature,
   getPaymentIntent,
   getCheckoutSession,
+  stripeForOrder,
 };

@@ -23,10 +23,11 @@ function salePayload(order, items, jobs) {
   if (!lines.length || new Set(lines.map(l => l.guid)).size !== lines.length)
     throw Error('Invalid sale lines');
   const cents = value => Math.round(Number(value || 0) * 100);
-  return { version: 1, action: 'createSale', orderId: order.id, paidLive: order.paidLive,
+  return { version: 2, action: 'createSale', fulfillment: 'work_order', orderId: order.id, paidLive: order.paidLive,
     isIntegrationTest: !!order.isIntegrationTest, paidAt: new Date(order.paidAt).toISOString(),
     createdAt: new Date(order.createdAt).toISOString(), customer, lines,
     websiteTaxCents: cents(order.tax), websiteTotalCents: cents(order.total),
+    websiteShippingCents: cents(order.shippingAmount), paymentIntentId: order.stripePaymentIntentId || null,
     taxMode: 'not_taxable', currency: 'USD' };
 }
 module.exports = { salePayload };

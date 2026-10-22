@@ -1,5 +1,6 @@
 const { Order, OrderProduct, Product } = require('../models/models');
-const { verifyWebhookSignature, getCheckoutSession, stripe } = require('../utils/stripe');
+const { verifyWebhookSignature, getCheckoutSession, stripeForOrder } = require('../utils/stripe');
+const { authorizedStripeTest } = require('../utils/stripeTest');
 const { confirmPayment, releaseReservation } = require('../integrations/carparts/orders');
 const { sendOrderConfirmation, sendOrderNotification } = require('../utils/mailer');
 
@@ -47,11 +48,20 @@ class StripeWebhookController {
     if (
       process.env.NODE_ENV === 'production' &&
       !event.livemode &&
-      process.env.STRIPE_ACCEPT_TEST_EVENTS !== 'true'
+      !authorizedStripeTest(event.data?.object?.metadata?.orderId)
     )
       return res.json({ received: true, ignored: 'test event' });
     try {
       const object = event.data.object;
+      if (event.livemode === false && process.env.NODE_ENV === 'production') {
+        const testOrder = await Order.findByPk(object.metadata?.orderId);
+        if (!testOrder?.isIntegrationTest || testOrder.paidLive)
+          return res.json({received:true,ignored:'not an integration test order'});
+        // Only Checkout/payment events are used by the bounded operator tests.
+        if (!['checkout.session.completed','checkout.session.async_payment_succeeded','payment_intent.succeeded',
+          'checkout.session.expired','checkout.session.async_payment_failed'].includes(event.type))
+          return res.json({received:true,ignored:'unsupported test event'});
+      }
       switch (event.type) {
         case 'checkout.session.completed':
         case 'checkout.session.async_payment_succeeded':
@@ -59,7 +69,7 @@ class StripeWebhookController {
           break;
         case 'payment_intent.succeeded':
           if (object.metadata?.orderId) {
-            const sessions = await stripe.checkout.sessions.list({
+            const sessions = await stripeForOrder(object.metadata.orderId, event.livemode).checkout.sessions.list({
               payment_intent: object.id,
               limit: 1,
             });
@@ -94,7 +104,10 @@ class StripeWebhookController {
     if (!orderId) return;
     const order = await Order.findByPk(orderId);
     if (!order) throw Error('Paid order not found');
-    const full = await getCheckoutSession(session.id);
+    if (event.livemode === false && process.env.NODE_ENV === 'production' &&
+        (!authorizedStripeTest(orderId) || !order.isIntegrationTest || order.paidLive))
+      throw Error('Stripe test payment is not authorized');
+    const full = await getCheckoutSession(session.id, {orderId, livemode:event.livemode});
     if (
       full.payment_status !== 'paid' ||
       full.currency !== 'usd' ||
@@ -124,12 +137,12 @@ class StripeWebhookController {
     if (order.delivey_type === 'ups')
       Object.assign(updates, this.extractShippingAddressFromCheckoutSession(full) || {});
     const result = await confirmPayment(orderId, {
-      paymentIntentId: session.payment_intent,
+      paymentIntentId: full.payment_intent,
       paidLive: event.livemode === true,
       paidAt: new Date(event.created * 1000),
       updates,
     });
-    if (result.applied) await this.sendOrderConfirmationEmail(result.order);
+    if (result.applied && !result.order.isIntegrationTest) await this.sendOrderConfirmationEmail(result.order);
   }
 
   /**

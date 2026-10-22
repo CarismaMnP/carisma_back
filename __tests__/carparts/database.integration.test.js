@@ -218,7 +218,7 @@ suite('CarParts transactional integration', () => {
     bridge.mockReset();
     bridge
       .mockRejectedValueOnce(Error('Disconnected after request'))
-      .mockResolvedValueOnce({ok:true,state:'already_posted',orderId:order.id,workOrder:'900',invoice:'800',taxCents:0,subtotalCents:2500});
+      .mockResolvedValueOnce({ok:true,state:'already_work_order',orderId:order.id,workOrder:'900',invoice:null,finalized:false,lineCount:1,taxCents:0,subtotalCents:2500});
     const { processSales } = require('../../integrations/carparts/sales');
     await processSales();
     const job = await models.CarpartsJob.findOne();
@@ -410,13 +410,13 @@ suite('CarParts transactional integration', () => {
     await orders.confirmPayment(order.id,{paidLive:true,updates:{tax:4.8,total:68.8,billingAddress:{line1:'Invoice street'},shippingAddress:{line1:'Delivery street'}}});
     await ps[0].update({price:999});
     const bridge=require('../../integrations/carparts/transport').bridge;
-    bridge.mockImplementation(async payload => ({ok:true,state:'posted',orderId:payload.orderId,workOrder:'900',invoice:'800',taxCents:0,subtotalCents:5000}));
+    bridge.mockImplementation(async payload => ({ok:true,state:'work_order',orderId:payload.orderId,workOrder:'900',invoice:null,finalized:false,lineCount:2,taxCents:0,subtotalCents:5000}));
     const {processSales}=require('../../integrations/carparts/sales');
     expect((await processSales()).processed).toBe(2);
     const payload=bridge.mock.calls.at(-1)[0];expect(payload.action).toBe('createSale');expect(payload.lines).toHaveLength(2);
     expect(payload.lines.map(l=>l.priceCents)).toEqual([2500,2500]);expect(payload.customer.shipping.line1).toBe('Delivery street');
     expect(payload.websiteTaxCents).toBe(480);expect(payload.taxMode).toBe('not_taxable');
-    expect((await order.reload()).checkmateInvoice).toBe('800');
+    expect((await order.reload()).checkmateInvoice).toBeNull();expect(order.checkmateWorkOrder).toBe('900');
     expect(await models.CarpartsJob.count({where:{state:'succeeded'}})).toBe(2);
     expect((await ps[0].reload()).sourceMissing).toBe(false);expect((await manual.reload()).count).toBe(1);
     expect((await processSales()).processed).toBe(0);expect(bridge.mock.calls.filter(c=>c[0].action==='createSale')).toHaveLength(1);
@@ -434,7 +434,7 @@ suite('CarParts transactional integration', () => {
     expect(bridge.mock.calls.at(-1)[0]).toEqual(first);expect((await models.CarpartsJob.findOne()).state).toBe('review');
     expect((await processSales()).processed).toBe(0);
   });
-  test('normal worker excludes authorized test orders; only explicit test process can post them', async () => {
+  test('normal worker excludes authorized test orders; only explicit test process can hand them off', async () => {
     process.env.CARPARTS_SALES_ENABLED='true';process.env.CARPARTS_SALES_AFTER='2020-01-01T00:00:00Z';
     await catalog.syncCatalog({snapshot:snapshot([row()])});const p=await models.Product.findOne();
     const testId=require('crypto').randomUUID();
@@ -445,7 +445,7 @@ suite('CarParts transactional integration', () => {
     const {processSales}=require('../../integrations/carparts/sales');expect((await processSales()).processed).toBe(0);
     expect((await models.CarpartsJob.findOne()).state).toBe('pending');
     const bridge=require('../../integrations/carparts/transport').bridge;
-    bridge.mockImplementation(async payload=>({ok:true,state:'posted',orderId:payload.orderId,workOrder:'901',invoice:'801',taxCents:0,subtotalCents:2500}));
+    bridge.mockImplementation(async payload=>({ok:true,state:'work_order',orderId:payload.orderId,workOrder:'901',invoice:null,finalized:false,lineCount:1,taxCents:0,subtotalCents:2500}));
     expect((await processSales({testOrderId:testId})).processed).toBe(1);expect((await order.reload()).paidLive).toBe(false);
     delete process.env.CARPARTS_TEST_ORDER_ID;
   });

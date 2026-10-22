@@ -4,8 +4,10 @@ const {Op} = require('sequelize');
 const job = {productId:1,guid:'G',inventoryId:'I',tag:'T'};
 const item = {productId:1,count:1,unitPriceCents:1234,productSnapshot:{source:'carparts',guid:'G',inventoryId:'I',tag:'T',name:'Part'}};
 const order = {id:'order',fullName:' Buyer ',mail:'buyer@example.invalid',paidAt:new Date(),createdAt:new Date(),paidLive:true,tax:0.93,total:13.27,billingAddress:{line1:'Billing'},shippingAddress:{line1:'Shipping'}};
-test('native invoice uses captured net price and transfers customer; keeps website tax separate', () => {
- const p = salePayload(order,[item],[job]);
+test('editable work order uses captured net price and transfers customer and Stripe receipt separately', () => {
+ const p = salePayload({...order,stripePaymentIntentId:'pi_verified',shippingAmount:3},[item],[job]);
+ expect(p.version).toBe(2);expect(p.fulfillment).toBe('work_order');
+ expect(p.paymentIntentId).toBe('pi_verified');expect(p.websiteShippingCents).toBe(300);
  expect(p.lines[0].priceCents).toBe(1234);expect(p.taxMode).toBe('not_taxable');
  expect(p.websiteTaxCents).toBe(93);expect(p.customer.billing.line1).toBe('Billing');expect(p.customer.shipping.line1).toBe('Shipping');
 });

@@ -1,5 +1,5 @@
 param($Request,[switch]$AuditOnly)
-# Native work-order/invoice workflow; never UPDATE/DELETE business tables.
+# Native editable work-order handoff; never finalize, post, or UPDATE/DELETE business tables.
 # Checkpoints are flushed before each native call. Uncertain writes require reconciliation.
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 . "$PSScriptRoot\native-sale-contract.ps1"
@@ -32,6 +32,7 @@ function Text([object]$value,[int]$max=100) {
 }
 function Native([string]$key,[string]$method,$fields) {
  if($AuditOnly){throw 'Audit cannot write'}
+ if($method-notin@('WOCreate','WOAddPart')){throw 'Only editable work-order operations are allowed'}
  if(@($state.attempts|Where-Object{$_.key-eq$key}).Count){throw ('Uncertain native call '+$key+'; inspect work order before retry')}
  $expected=@($specs.$method);$values=@()
  foreach($k in $fields.Keys){if($k-notin$expected){throw 'Unexpected native argument'}}
@@ -43,7 +44,7 @@ function Native([string]$key,[string]$method,$fields) {
  $state.attempts[-1].returned=$true;Save
  if(!$r.Count -or [string]::IsNullOrWhiteSpace([string]$r[0].Result) -or [string]$r[0].Result-match'^(ERROR|FAIL)'){throw ('Native '+$method+' rejected; inspect checkpoint')}
 }
-function Headers {return @(Q 'SELECT WONum,WOStatus,Finalized,InvoiceNum,CustomerBillTo,Email,PO,AmountPaid,MethodOfPayment,PartsSubtotal,Tax,TotalPrice,Freight FROM SQLUser.WOSummary WHERE Yard=9032 AND PO=?' @($po))}
+function Headers {return @(Q 'SELECT WONum,WOType,WOStatus,Finalized,InvoiceNum,CustomerBillTo,Email,PO,AmountPaid,MethodOfPayment,PartsSubtotal,Tax,TotalPrice,Freight FROM SQLUser.WOSummary WHERE Yard=9032 AND PO=?' @($po))}
 function EmailAddress($value) {return (([string]$value)-replace '^mailto:','').Trim()}
 function Header {
  $hs=@(Headers);if($hs.Count-ne1){throw 'Expected one work order for website reference'}
@@ -66,7 +67,7 @@ function Available($line) {
 }
 function VerifyDetails([switch]$Complete) {
  $ds=@(Details)
- if($Complete -and $ds.Count-ne$lines.Count){throw 'Invoice line count mismatch'}
+ if($Complete -and $ds.Count-ne$lines.Count){throw 'Work-order line count mismatch'}
  foreach($d in $ds){
   $ls=@($lines|Where-Object{$_.guid-eq$d.GUID})
   if($ls.Count-ne1 -or $d.Tag-ne$ls[0].tag -or $d.LineItemType-ne'Regular sale' -or
@@ -78,9 +79,34 @@ function VerifyPayment($h) {
  if($h.Finalized-ne'Yes' -or $h.MethodOfPayment-ne'PrePaid' -or [decimal]$h.Tax-ne0 -or
     [decimal]$h.Freight-ne0 -or [decimal]$h.PartsSubtotal-ne$total -or [decimal]$h.TotalPrice-ne$total -or [decimal]$h.AmountPaid-ne$total){throw 'Invoice payment or totals mismatch'}
 }
+function VerifyEditable($h) {
+ if($h.Finalized-eq'Yes' -or [long]$h.InvoiceNum-gt0 -or $h.WOType-ne'WK' -or
+    $h.WOStatus-notin@('Not Printed','Printed')){throw 'Work order is no longer editable; manager review required'}
+}
+function CompletedHandoff {
+ if(!$state.handoff){return $null}
+ $r=$state.handoff
+ if($r.orderId-ne$id -or [string]$r.workOrder-ne[string]$state.wo -or $r.state-ne'work_order' -or
+    $r.invoice -or $r.finalized-ne$false -or $r.lineCount-ne$lines.Count -or $r.subtotalCents-ne$totalCents -or $r.taxCents-ne0){throw 'Invalid saved work-order handoff'}
+ # The receipt proves the original transfer, not the manager's current state. Never
+ # rewrite, revalidate mutable customer/price fields, or finalize a handed-off order.
+ return [pscustomobject]@{ok=$true;state='already_work_order';orderId=$id;workOrder=$state.wo;invoice=$null;finalized=$false;
+  subtotalCents=$totalCents;taxCents=0;writeCalled=$false;lineCount=$lines.Count;handedOffAt=$r.handedOffAt}
+}
+function CompleteWorkOrder {
+ $h=Header;VerifyDetails -Complete;VerifyEditable $h
+ if([decimal]$h.Tax-ne0 -or [decimal]$h.Freight-ne0 -or [decimal]$h.PartsSubtotal-ne$total -or [decimal]$h.TotalPrice-ne$total){throw 'Work-order totals mismatch'}
+ foreach($line in $lines){$t=Target $line;if(([string]$t.Status).Trim()-ne'W' -or [string]$t.WONum-ne[string]$state.wo){throw 'Inventory is not allocated to this work order'}}
+ $receipt=[pscustomobject]@{ok=$true;state='work_order';orderId=$id;workOrder=$state.wo;invoice=$null;finalized=$false;
+  subtotalCents=$totalCents;taxCents=0;writeCalled=$writeCalled;lineCount=$lines.Count;handedOffAt=[datetime]::UtcNow.ToString('o')}
+ $state.fingerprint=$fingerprint;$state|Add-Member -NotePropertyName handoff -NotePropertyValue $receipt -Force
+ Save
+ return $receipt
+}
 try {
  $id=[string]$Request.orderId
- if($id-notmatch'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$' -or $Request.version-ne1 -or $Request.currency-ne'USD' -or $Request.taxMode-ne'not_taxable'){throw 'Invalid sale contract'}
+ if($id-notmatch'^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$' -or $Request.version-notin@(1,2) -or $Request.currency-ne'USD' -or $Request.taxMode-ne'not_taxable' -or
+    ($Request.version-eq2 -and $Request.fulfillment-ne'work_order')){throw 'Invalid sale contract'}
  $po='WEB '+$id;$lines=@($Request.lines)
  if(!$lines.Count -or $lines.Count-gt100){throw 'Invalid sale size'}
  $totalCents=0
@@ -103,8 +129,11 @@ try {
   $fields[$prefix+'Addr3']=Text ((@($a.city,$a.state,$a.postal_code)|Where-Object{$_}) -join ' ') 80
   $fields[$prefix+'Addr4']=Text $a.country 40
  }
- $note='Website '+$id+'. Website tax '+([decimal]$Request.websiteTaxCents/100).ToString('0.00',[Globalization.CultureInfo]::InvariantCulture)+' USD recorded separately; Checkmate lines non-taxable.'
- if($Request.isIntegrationTest-eq$true){$note='TEST - NO REAL PAYMENT - DO NOT SHIP. '+$note}
+ $culture=[Globalization.CultureInfo]::InvariantCulture
+ $note='PAID ON WEBSITE. USD '+([decimal]$Request.websiteTotalCents/100).ToString('0.00',$culture)+
+  '; tax '+([decimal]$Request.websiteTaxCents/100).ToString('0.00',$culture)+'; shipping '+([decimal]$Request.websiteShippingCents/100).ToString('0.00',$culture)+
+  '. Stripe '+(Text $Request.paymentIntentId 70)+'. WO only; manager to complete. Do not charge again. Lines non-taxable.'
+ if($Request.isIntegrationTest-eq$true){$note='TEST - NO REAL PAYMENT - DO NOT SHIP. Website '+$id+'. WO only; manager to review. Lines non-taxable.'}
  $fields['Notes']=Text $note 180
  try{$locked=$mutex.WaitOne(5000)}catch [Threading.AbandonedMutexException]{$locked=$true}
  if(!$locked){throw 'Sale bridge busy; retry later'}
@@ -119,8 +148,16 @@ try {
  if(Test-Path -LiteralPath $statePath){$state=Get-Content -Raw -LiteralPath $statePath|ConvertFrom-Json
   if($state.orderId-ne$id -or ($state.fingerprint-ne$fingerprint -and $state.fingerprint-ne$legacyFingerprint)){throw 'Immutable sale payload differs from checkpoint'}
  }
+ $config=Get-Content -Raw -LiteralPath "$PSScriptRoot\config.json"|ConvertFrom-Json
+ $testAllowed=($Request.isIntegrationTest-eq$true -and $Request.paidLive-ne$true -and $config.testSale.orderId-eq$id -and
+  $lines.Count-eq1 -and $lines[0].guid-eq$config.testSale.guid -and [datetimeoffset]$config.testSale.expiresAt-gt[datetimeoffset]::UtcNow)
+ if(!$AuditOnly -and ($config.enableSales-ne$true -or (!$testAllowed -and ($Request.paidLive-ne$true -or $Request.isIntegrationTest-eq$true)) -or
+    !$config.salesAfter -or !$Request.paidAt -or !$Request.createdAt -or
+    [datetimeoffset]$Request.paidAt-lt[datetimeoffset]$config.salesAfter -or [datetimeoffset]$Request.createdAt-lt[datetimeoffset]$config.salesAfter)){throw 'Sale is not authorized'}
+ $completed=CompletedHandoff
+ if($completed){$completed|ConvertTo-Json -Compress;return}
  $c.Open()
- foreach($method in @('WOCreate','WOAddPart','FinalizeWO','PostInvoice')) {
+ foreach($method in @('WOCreate','WOAddPart')) {
   $live=@(Q 'SELECT FormalSpec FROM %Dictionary.MethodDefinition WHERE Parent=? AND Name=?' @('User.WorkOrder',$method))
   $actual=@([regex]::Split([string]$live[0].FormalSpec,',(?=\w+:)')|ForEach-Object{($_ -split ':',2)[0]})
   if(($actual-join',')-cne(@($specs.$method)-join',')){throw 'Native parameter contract changed'}
@@ -140,21 +177,24 @@ try {
   foreach($line in $lines){$null=Available $line}
  }
  if($AuditOnly){[pscustomobject]@{ok=$true;state='audit_only';orderId=$id;workOrder=$state.wo;writeCalled=$false;lines=$lines.Count;subtotalCents=$totalCents;taxCents=0}|ConvertTo-Json -Compress;return}
- $config=Get-Content -Raw -LiteralPath "$PSScriptRoot\config.json"|ConvertFrom-Json
- $testAllowed=($Request.isIntegrationTest-eq$true -and $Request.paidLive-ne$true -and $config.testSale.orderId-eq$id -and
-  $lines.Count-eq1 -and $lines[0].guid-eq$config.testSale.guid -and [datetimeoffset]$config.testSale.expiresAt-gt[datetimeoffset]::UtcNow)
- if($config.enableSales-ne$true -or (!$testAllowed -and ($Request.paidLive-ne$true -or $Request.isIntegrationTest-eq$true)) -or
-    !$config.salesAfter -or !$Request.paidAt -or !$Request.createdAt -or
-    [datetimeoffset]$Request.paidAt-lt[datetimeoffset]$config.salesAfter -or [datetimeoffset]$Request.createdAt-lt[datetimeoffset]$config.salesAfter){throw 'Sale is not authorized'}
  if(!(Test-Path -LiteralPath (Split-Path $statePath))){$null=New-Item -ItemType Directory -Path (Split-Path $statePath)}
  if(!$state.wo){Native 'create' 'WOCreate' $fields;$headers=@(Headers)
   if($headers.Count-ne1){throw 'WOCreate outcome unknown'};$state.wo=[string]$headers[0].WONum;Save}
  $h=Header;VerifyDetails
- if($h.WOStatus-ne'Posted'){
+ # Legacy receipts can be acknowledged, but this code never performs financial writes.
+ if($h.WOStatus-eq'Posted'){
+  if($Request.version-ne1){throw 'Unexpected posted invoice; manager review required'}
+  VerifyDetails -Complete;VerifyPayment $h
+  if([long]$h.InvoiceNum-le0){throw 'Legacy invoice missing'}
+  foreach($line in $lines){$t=Target $line;if(([string]$t.Status).Trim()-ne'S' -or [string]$t.WONum-ne[string]$state.wo){throw 'Legacy sold inventory mismatch'}}
+  $state.fingerprint=$fingerprint;$state.invoice=[string]$h.InvoiceNum;Save
+  [pscustomobject]@{ok=$true;state='already_posted';orderId=$id;workOrder=$state.wo;invoice=$state.invoice;subtotalCents=$totalCents;taxCents=0;writeCalled=$false;lineCount=$lines.Count}|ConvertTo-Json -Compress;return
+ }
+ VerifyEditable $h
   foreach($line in $lines){
    $existing=@(Details|Where-Object{$_.GUID-eq$line.guid})
    if($existing.Count){continue}
-   if($h.Finalized-eq'Yes' -or $h.InvoiceNum-gt0){throw 'Incomplete order already finalized'}
+   VerifyEditable (Header)
    $t=Available $line
    Native ('add:'+ $line.guid) 'WOAddPart' ([ordered]@{Yard='9032';WO=[string]$state.wo;ReqModel=[string]$t.Model;ReqYear=([int]$t.Yr%100).ToString('00');GUID=$line.guid;
     Price=([decimal]$line.priceCents/100).ToString('0.00',[Globalization.CultureInfo]::InvariantCulture);Tax='N';Warranty='90D';Discount='N';Description=[string]$t.Description;
@@ -163,19 +203,7 @@ try {
    VerifyDetails
    if(@(Details|Where-Object{$_.GUID-eq$line.guid}).Count-ne1){throw 'WOAddPart outcome unknown'}
   }
-  VerifyDetails -Complete
-  $h=Header
-  if($h.Finalized-ne'Yes'){
-   Native 'finalize' 'FinalizeWO' ([ordered]@{Yard='9032';WO=[string]$state.wo;UID='100';Payment='T';Method='9';Deposit='0';Freight='0';FreightTax='N';RemoveDepositForce='N';TakeOwnership='WK'})
-  }
-  $h=Header;VerifyPayment $h
-  Native 'post' 'PostInvoice' ([ordered]@{Yard='9032';WO=[string]$state.wo;UID='100'})
- }
- $h=Header;VerifyDetails -Complete;VerifyPayment $h
- if($h.WOStatus-ne'Posted' -or [long]$h.InvoiceNum-le0){throw 'Invoice posting outcome unknown'}
- foreach($line in $lines){$t=Target $line;if(([string]$t.Status).Trim()-ne'S' -or [string]$t.WONum-ne[string]$state.wo){throw 'Inventory is not sold on this work order'}}
- $state.fingerprint=$fingerprint;$state.invoice=[string]$h.InvoiceNum;Save
- [pscustomobject]@{ok=$true;state=$(if($writeCalled){'posted'}else{'already_posted'});orderId=$id;workOrder=$state.wo;invoice=$state.invoice;subtotalCents=$totalCents;taxCents=0;writeCalled=$writeCalled;lineCount=$lines.Count}|ConvertTo-Json -Compress
+ CompleteWorkOrder|ConvertTo-Json -Compress
 }catch {
  [pscustomobject]@{ok=$false;state='review_required';orderId=$Request.orderId;workOrder=$state.wo;writeCalled=$writeCalled;error=$_.Exception.Message}|ConvertTo-Json -Compress
 }finally {if($locked){$mutex.ReleaseMutex()};$mutex.Dispose();$c.Close();$c.Dispose()}

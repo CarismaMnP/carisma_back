@@ -1,4 +1,4 @@
-// One operator-authorized real Checkmate sale without a Stripe charge or customer email.
+// One operator-authorized real Checkmate work order without a Stripe charge or customer email.
 // Never scheduled. Both backend and Windows must allowlist this exact order/part.
 require('../utils/loadEnvironment');
 const {sequelize}=require('../db');
@@ -29,6 +29,6 @@ async function main() {
  const jobs=await CarpartsJob.findAll({where:{orderId:id},attributes:['state','result','lastError'],raw:true});
  console.log(JSON.stringify({orderId:id,isIntegrationTest:order.isIntegrationTest,paidLive:order.paidLive,
    productId,subtotal:order.sum,tax:order.tax,invoice:order.checkmateInvoice,workOrder:order.checkmateWorkOrder,jobs}));
- if (!order.checkmateInvoice || jobs.some(j=>j.state!=='succeeded')) throw Error('Test is incomplete: inspect this same order; do not create another');
+ if (!order.checkmateWorkOrder || order.checkmateInvoice || jobs.some(j=>j.state!=='succeeded' || !['work_order','already_work_order'].includes(j.result?.state))) throw Error('Test is incomplete: inspect this same order; do not create another');
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;}).finally(()=>sequelize.close());
