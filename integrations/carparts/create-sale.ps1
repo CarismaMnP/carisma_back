@@ -62,8 +62,14 @@ function Available($line) {
  $t=Target $line
  if($t.Available-ine'Yes' -or $t.Private-ieq'Yes' -or ([string]$t.Status).Trim() -or ([string]$t.EbayStatus).Trim()-ieq'C' -or ([string]$t.DisplayStatus).Trim()-ieq'C' -or $t.WONum -or $t.HoldName){throw 'Part no longer available; review required'}
  if(($t.AssemblyParentGUID -and $t.AssemblyParentGUID-ne'X') -or @(Q 'SELECT GUID FROM SQLUser.Inventory WHERE AssemblyParentGUID=?' @($line.guid)).Count){throw 'Assembly part requires manual sale'}
- if(@(Q 'SELECT WONum FROM SQLUser.WODetail WHERE GUID=?' @($line.guid)).Count){throw 'Inventory already assigned to a work order'}
+ AssertNoActiveWorkOrder $line.guid
  return $t
+}
+function AssertNoActiveWorkOrder($guid) {
+ # Posted sale/return history remains after a part is returned to available stock.
+ # Availability above is authoritative; only an unresolved/open document conflicts.
+ $history=@(Q 'SELECT d.WONum,h.WOStatus,h.Finalized FROM SQLUser.WODetail d LEFT JOIN SQLUser.WOSummary h ON h.Yard=d.Yard AND h.WONum=d.WONum WHERE d.GUID=?' @($guid))
+ foreach($h in $history){if($h.WOStatus-ne'Posted' -or $h.Finalized-ne'Yes'){throw 'Inventory already assigned to an active or unresolved work order'}}
 }
 function VerifyDetails([switch]$Complete) {
  $ds=@(Details)

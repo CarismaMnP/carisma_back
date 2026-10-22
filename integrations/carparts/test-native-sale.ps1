@@ -4,7 +4,7 @@ $tokens=$null;$errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'create-sale.ps1'),[ref]$tokens,[ref]$errors)
 if($errors.Count){throw 'Sale script has syntax errors'}
 . "$PSScriptRoot\native-sale-contract.ps1"
-foreach($name in @('Save','Native','Canonical','EmailAddress','VerifyEditable','CompleteWorkOrder','CompletedHandoff')){
+foreach($name in @('Save','Native','Canonical','EmailAddress','VerifyEditable','CompleteWorkOrder','CompletedHandoff','AssertNoActiveWorkOrder')){
  $fn=$ast.Find({param($node) $node-is[Management.Automation.Language.FunctionDefinitionAst] -and $node.Name-eq$name},$true)
  . ([scriptblock]::Create($fn.Extent.Text))
 }
@@ -60,5 +60,16 @@ try {
  function Target($line){throw 'Manager-owned inventory must not be changed'}
  $retry=CompletedHandoff
  if($retry.state-ne'already_work_order' -or $retry.writeCalled -or $script:calls-ne2){throw 'Handoff replay was not a no-op'}
- [pscustomobject]@{ok=$true;checks=@('syntax','atomic-checkpoint','duplicate-call-blocked','lost-response-checkpoint','uncertain-write-not-replayed','audit-read-only','timezone-expiry','canonical-payload','financial-writes-forbidden','incomplete-finalized-or-unallocated-blocked','multi-line-handoff','manager-edits-preserved-on-retry');databaseCalls=0}|ConvertTo-Json -Compress
+ $script:history=@()
+ function Q($sql,$values){return $script:history}
+ AssertNoActiveWorkOrder 'returned-part'
+ $script:history=@([pscustomobject]@{WONum=2480;WOStatus='Posted';Finalized='Yes'},[pscustomobject]@{WONum=2483;WOStatus='Posted';Finalized='Yes'})
+ AssertNoActiveWorkOrder 'returned-part'
+ foreach($case in @('Not Printed','Printed','Canceled',$null)){
+  $script:history+= [pscustomobject]@{WONum=2500;WOStatus=$case;Finalized=$null}
+  $blocked=$false;try{AssertNoActiveWorkOrder 'returned-part'}catch{$blocked=$true}
+  if(!$blocked){throw 'Active or unresolved work order was ignored'}
+  $script:history=@($script:history|Where-Object{$_.WONum-ne2500})
+ }
+ [pscustomobject]@{ok=$true;checks=@('syntax','atomic-checkpoint','duplicate-call-blocked','lost-response-checkpoint','uncertain-write-not-replayed','audit-read-only','timezone-expiry','canonical-payload','financial-writes-forbidden','incomplete-finalized-or-unallocated-blocked','multi-line-handoff','manager-edits-preserved-on-retry','returned-stock-history-allowed','active-and-unresolved-order-blocked');databaseCalls=0}|ConvertTo-Json -Compress
 }finally{Remove-Item -LiteralPath $dir -Recurse -Force}
