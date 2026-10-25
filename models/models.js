@@ -79,6 +79,8 @@ const Product = sequelize.define('product', {
   carpartsGuid: {type: DataTypes.STRING(36), unique: true},
   carpartsInventoryId: DataTypes.STRING,
   carpartsTag: DataTypes.STRING,
+  carpartsPriceCents: DataTypes.INTEGER,
+  priceOverrideCents: DataTypes.INTEGER,
   carpartsHash: DataTypes.STRING(64),
   carpartsData: DataTypes.JSONB,
   carpartsPartCode: DataTypes.STRING(16),
@@ -112,6 +114,9 @@ const Order = sequelize.define('order', {
   sum: { type: DataTypes.FLOAT, allowNull: false },
   tax: { type: DataTypes.FLOAT, allowNull: true, defaultValue: 0 },
   total: { type: DataTypes.FLOAT, allowNull: true, defaultValue: 0 },
+  promoCode: DataTypes.STRING(40),
+  promoId: DataTypes.UUID,
+  discountCents: {type: DataTypes.INTEGER,allowNull:false,defaultValue:0},
   fullName: { type: DataTypes.STRING, allowNull: true },
   phone: { type: DataTypes.STRING, allowNull: true },
   mail: { type: DataTypes.STRING, allowNull: true },
@@ -154,6 +159,7 @@ const OrderProduct = sequelize.define('orderProduct', {
   count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   selectorValue: { type: DataTypes.STRING, allowNull: false, defaultValue: '' },
   unitPriceCents: DataTypes.INTEGER,
+  discountCents: {type: DataTypes.INTEGER,allowNull:false,defaultValue:0},
   productSnapshot: DataTypes.JSONB,
 });
 
@@ -266,6 +272,7 @@ carpartsModels.CarpartsJob.belongsTo(Order, {foreignKey: 'orderId', constraints:
 
 module.exports = {
   ...carpartsModels,
+  ...require('../integrations/pricing/models')(sequelize),
   ...require('../integrations/freight/models')(sequelize),
   User,
   Category,

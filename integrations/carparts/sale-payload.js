@@ -17,8 +17,10 @@ function salePayload(order, items, jobs) {
     if (!s || s.source !== 'carparts' || s.guid !== job.guid || s.inventoryId !== job.inventoryId ||
         s.tag !== job.tag || item.count !== 1 || !Number.isSafeInteger(item.unitPriceCents) || item.unitPriceCents <= 0)
       throw Error('Captured checkout price or inventory identity missing; manual review required');
+    if (!Number.isSafeInteger(item.discountCents || 0) || (item.discountCents || 0) < 0 || (item.discountCents || 0) >= item.unitPriceCents)
+      throw Error('Invalid captured line discount');
     return { guid: job.guid, inventoryId: job.inventoryId, tag: job.tag,
-      priceCents: item.unitPriceCents, quantity: 1, name: s.name };
+      priceCents: item.unitPriceCents - (item.discountCents || 0), quantity: 1, name: s.name };
   }).sort((a,b) => a.guid.localeCompare(b.guid));
   if (!lines.length || new Set(lines.map(l => l.guid)).size !== lines.length)
     throw Error('Invalid sale lines');

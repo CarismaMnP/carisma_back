@@ -31,7 +31,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
   const items = orderItems(data.products);
   const sourced = await Product.findAll({
     where: { id: { [Op.in]: items.map(x => x.productId) }, source: 'carparts' },
-    attributes: ['id', 'carpartsGuid', 'price'],
+    attributes: ['id', 'carpartsGuid', 'price', 'priceOverrideCents'],
     raw: true,
   });
   let checkedAt = Date.now();
@@ -55,7 +55,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
       throw Error('Inventory connection is temporarily unavailable');
     for (const p of sourced) {
       const row = response.items.find(r => r.GUID === p.carpartsGuid);
-      if (!row || availability(row) !== 'available' || Number(row.PriceRetail) !== Number(p.price))
+      if (!row || availability(row) !== 'available' || (p.priceOverrideCents == null && Number(row.PriceRetail) !== Number(p.price)))
         throw Error(
           'This part has changed availability or price. Please refresh the catalog shortly.',
         );
@@ -78,7 +78,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
             s =>
               s.id === p.id &&
               s.carpartsGuid === p.carpartsGuid &&
-              Number(s.price) === Number(p.price),
+              Number(s.price) === Number(p.price) && s.priceOverrideCents === p.priceOverrideCents,
           ),
       ) ||
       Date.now() - checkedAt > 30000
@@ -89,7 +89,6 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
       if (!state?.data?.finishedAt || Date.now() - Date.parse(state.data.finishedAt) > 15 * 60000)
         throw Error('Inventory connection is temporarily unavailable. Please try again shortly.');
     }
-    let sum = 0;
     for (const p of products) {
       const n = items.find(x => x.productId === p.id).count;
       if (
@@ -102,9 +101,9 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
       )
         throw Error(`${p.name} is no longer available in this quantity`);
       if (p.source === 'carparts' && n !== 1) throw Error('This part is a single inventory item');
-      sum += Math.round(p.price * 100) * n;
     }
     const shipping = await require('../freight/service').checkoutShipping(data, products, items, transaction);
+    const pricing = await require('../pricing/promos').calculate(data.promoCode, items.map(x => ({...x, unitPriceCents:Math.round(products.find(p=>p.id===x.productId).price*100)})), transaction);
     const now = new Date();
     const order = await Order.create(
       {
@@ -115,7 +114,10 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
         phone: data.phone,
         delivey_type: data.delivey_type,
         state: 'pending',
-        sum: sum / 100,
+        sum: pricing.subtotalCents / 100,
+        discountCents: pricing.discountCents,
+        promoCode: pricing.promo?.code || null,
+        promoId: pricing.promo?.id || null,
         stockReservedAt: now,
         reservationExpiresAt: new Date(now.getTime() + 35 * 60000),
         ...(authorizedTestId ? {id: authorizedTestId, isIntegrationTest: true} : {}),
@@ -126,8 +128,9 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
       items.map(x => {
         const p = products.find(product => product.id === x.productId);
         return { ...x, orderId: order.id, selectorValue: '', unitPriceCents: Math.round(p.price * 100),
+          discountCents: pricing.lines.find(line=>line.productId===x.productId).discountCents,
           productSnapshot: {name: p.name, source: p.source, guid: p.carpartsGuid,
-            inventoryId: p.carpartsInventoryId, tag: p.carpartsTag} };
+            inventoryId: p.carpartsInventoryId, tag: p.carpartsTag, stock: p.carpartsData?.stock || null} };
       }),
       { transaction },
     );
@@ -136,7 +139,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
         { count: p.count - items.find(x => x.productId === p.id).count },
         { transaction },
       );
-    return { order, products, items };
+    return { order, products, items:pricing.lines };
   });
 }
 async function releaseReservation(orderId, state = 'expired') {

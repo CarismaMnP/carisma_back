@@ -61,12 +61,13 @@ function summary(order,payment) {
   const p=order.get?order.get({plain:true}):order,expiry=payment?.expiresAt||expiresAt(order);
   const canResume=payment?payment.state==='open':reserved(order)&&!!order.checkoutSessionId&&Date.parse(expiry)>Date.now();
   return {id:p.id,state:p.state,createdAt:p.createdAt,paidAt:p.paidAt,
+    promoCode:p.promoCode||null,discountCents:p.discountCents||0,
     subtotalCents:Math.round(Number(p.sum)*100),shippingCents:Math.round(Number(p.shippingAmount||0)*100),taxCents:Math.round(Number(p.tax||0)*100),
     totalCents:p.stockAppliedAt||p.paidAt?Math.round(Number(p.total||(Number(p.sum)+Number(p.shippingAmount||0)+Number(p.tax||0)))*100):null,
     deliveryType:p.delivey_type,shippingAddress:p.freightAddress||p.shippingAddress,carrier:p.freightSnapshot?.result?.selected?.carrier||null,
     canResume,canCancel:reserved(order)&&!!order.checkoutSessionId&&(!payment||payment.state==='open'),paymentState:payment?.state||(canResume?'open':reserved(order)?'pending':'closed'),paymentExpiresAt:expiry,
     items:(p.orderProducts||[]).map(x=>({productId:x.productId,count:x.count,name:x.productSnapshot?.name||x.product?.name||'Part',
-      unitPriceCents:x.unitPriceCents??Math.round(Number(x.product?.price||0)*100),link:x.product?.link||null,image:x.product?.images?.[0]||null}))};
+      discountCents:x.discountCents||0,unitPriceCents:x.unitPriceCents??Math.round(Number(x.product?.price||0)*100),link:x.product?.link||null,image:x.product?.images?.[0]||null}))};
 }
 async function resume(userId,id) {
   const order=await ownedOrder(userId,id),payment=await inspectPayment(order);

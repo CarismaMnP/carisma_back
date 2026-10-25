@@ -12,6 +12,7 @@ router.get('/history',auth,handle(req=>checkout.history(req.user.id,req.query.pa
 router.post('/:id/resume',auth,handle(req=>checkout.withCheckoutLock(req.user.id,()=>checkout.resume(req.user.id,req.params.id))))
 router.post('/:id/cancel',auth,handle(req=>checkout.withCheckoutLock(req.user.id,()=>checkout.cancel(req.user.id,req.params.id))))
 
+router.post('/promo-quote',auth,handle(req=>require('../../integrations/pricing/promos').quote(req.body)))
 router.post('/shipping-requirements', auth, freight.requirements)
 router.post('/freight-quote', auth, freight.quote)
 

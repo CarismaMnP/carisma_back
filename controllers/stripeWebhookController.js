@@ -158,7 +158,7 @@ class StripeWebhookController {
       const products = orderProducts.map(op => ({
         name: op.product.name,
         count: op.count,
-        price: op.unitPriceCents != null ? op.unitPriceCents/100 : op.product.price,
+        price: op.unitPriceCents != null ? (op.unitPriceCents*op.count-(op.discountCents||0))/op.count/100 : op.product.price,
       }));
 
       const shippingAddress =

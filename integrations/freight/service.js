@@ -127,4 +127,4 @@ async function checkoutShipping(data,products,items,transaction) {
     country:address.country,city:address.city,zip_code:address.postal_code,addressState:address.state,
     address_line_1:address.line1,address_line_2:address.line2};
 }
-module.exports={requirements,createQuote,checkoutShipping,buildRequest,basket,destination,shippingAddress,fingerprint,publicQuote};
+module.exports={loadBasket,requirements,createQuote,checkoutShipping,buildRequest,basket,destination,shippingAddress,fingerprint,publicQuote};

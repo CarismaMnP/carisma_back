@@ -7,7 +7,7 @@ class OrderController {
     let reserved, session;
     try {
       const result = await checkout.withCheckoutLock(req.user?.id, async()=>{
-      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress } = req.body;
+      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress, promoCode } = req.body;
       const userId = req.user?.id;
       const existing = await checkout.matchingOrder(userId, products);
       if (existing) return checkout.resume(userId,existing.order.id);
@@ -16,23 +16,9 @@ class OrderController {
       const user = await User.findByPk(userId);
       if (!user) throw Error('User not found. Please authorize');
       reserved = await reserveOrder({ userId, fullName, mail, phone, delivey_type, products,
-        freightQuoteId, freightDestination, freightAddress });
+        freightQuoteId, freightDestination, freightAddress, promoCode });
       const { order, items } = reserved;
-      const lineItems = items.map(item => {
-        const product = reserved.products.find(p => p.id === item.productId);
-        return {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: product.name,
-              description: (product.about || product.name).slice(0, 500),
-              tax_code: 'txcd_99999999',
-            },
-            unit_amount: Math.round(product.price * 100),
-          },
-          quantity: item.count,
-        };
-      });
+      const lineItems = items.flatMap(item => require('../integrations/pricing/promos').stripeLines(reserved.products.find(p => p.id === item.productId),item));
       session = await createCheckoutSession({
         orderId: order.id,
         amount: order.sum,

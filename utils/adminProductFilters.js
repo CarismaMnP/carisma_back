@@ -14,8 +14,9 @@ function filters(query = {}) {
   const active = flag('active', true), inactive = flag('inactive', false);
   const page = integer('page',1,1000000), limit = integer('limit',25,100);
   const base = {};
-  for (const key of ['make','model','source','search'])
+  for (const key of ['make','model','source','search','category'])
     if (query[key] !== undefined && (typeof query[key] !== 'string' || query[key].length > 250)) throw Error(`Invalid ${key}`);
+  if (query.category) base.ebayCategory = query.category;
   if (query.make) base.make = query.make;
   if (query.model) base.ebayModel = query.model;
   if (query.source) {
@@ -36,6 +37,7 @@ function filters(query = {}) {
     const search = query.search.trim();
     const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
     base[Op.or] = ['name','carpartsTag','carpartsGuid'].map(k => ({[k]:{[Op.iLike]:pattern}}));
+    base[Op.or].push({'carpartsData.stock':{[Op.iLike]:pattern}});
     if (/^\d+$/.test(search) && Number(search) <= 2147483647) base[Op.or].push({id:Number(search)});
   }
   // Same availability rule as the public catalog, including hidden products in the inactive view.

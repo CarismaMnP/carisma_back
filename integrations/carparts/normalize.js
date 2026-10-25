@@ -98,6 +98,7 @@ function normalize(row, { parts, vehicles, images, links }) {
     carpartsPartCode: text(row.Part).toUpperCase(),
     name: title,
     description: text(row.Description),
+    carpartsPriceCents: Math.round((Number(row.PriceRetail) || 0) * 100),
     price: Number(row.PriceRetail) || 0,
     old_price: Number(row.PriceRetail) || 0,
     make: text(row.Manufacturer),
@@ -113,7 +114,8 @@ function normalize(row, { parts, vehicles, images, links }) {
         ...aspects
           .filter(x => x.name !== 'eBay Title')
           .map(x => ({ name: x.name, value: x.values.join(', ') })),
-        { name: 'Stock number', value: text(row.Tag) },
+        { name: 'Stock number', value: text(row.Stock) },
+        { name: 'Tag number', value: text(row.Tag) },
         { name: 'Mileage', value: text(vehicle.Mileage || row.Condition) },
         { name: 'Grade', value: text(row.PartGrade) },
         { name: 'Side', value: text(row.Side) },

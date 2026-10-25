@@ -159,6 +159,10 @@ async function syncCatalog({ snapshot, stageOnly = false } = {}) {
           count,
           ebayStock: item.data.available ? 1 : 0,
         };
+        if (product?.priceOverrideCents != null) {
+          payload.price = product.priceOverrideCents / 100;
+          payload.old_price = product.priceOverrideCents / 100;
+        }
         // Preserve previously curated category labels/fitment and all existing URLs and IDs.
         if (product?.ebayCategory) payload.ebayCategory = product.ebayCategory;
         if (product?.additionalFields?.localizedAspects) {
