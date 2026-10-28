@@ -31,6 +31,8 @@ For a per-product override, open **Указать упаковку FedEx** in Pr
 
 Server calculates prices from current inventory, never client amounts. Quotes are owner-scoped, cached for 30 minutes, persisted with full cart/price/package/address fingerprints and selected carrier service. Price, cart, package, account, ship date or address changes invalidate an unused quote. Pending and hourly limits bound provider traffic. No inventory is reserved while quoting.
 
+Address validation accepts a resolved DPV-confirmed address or, when FedEx omits the DPV attribute, an exact standardized street/postal match with ZIP11 and a delivery point. An omitted flag is not an explicit failure. Unresolved, ambiguous, interpolated, missing-unit and PO Box results remain blocked, as do changes to the delivery ZIP/state/country. The customer's entered address remains unchanged; the validation method is recorded with the quote.
+
 At order creation, stock and quote are checked in one DB transaction. Small and large charges are added. Stripe receives an order-specific Customer.shipping address and fixed shipping amount; it does not collect a second shipping address. Stripe Tax uses that customer address. Webhook records billing separately, preserves delivery address, and flags shipping amount/customer/quote discrepancies for review before Checkmate processing.
 
 Admin **Грузовая доставка → Посылки · FedEx** shows saved quote details and failures. Requests contain delivery addresses: retain administrator-only access. Credentials, bearer tokens and full Axios errors must not appear in logs or API responses.

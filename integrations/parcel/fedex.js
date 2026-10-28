@@ -73,18 +73,31 @@ function parseRates(data,environment) {
  if(!rates.length)throw Error('No FedEx parcel rates are available for this address. Contact us or choose self-pickup.');
  return {selected:rates[0],rates,virtual:virtual(data),transactionId:data.transactionId||null};
 }
-async function validateAddress(request,c) {
- const data=await post('/address/v1/addresses/resolve',{addressesToValidate:[{address:recipientAddress(request.address,request.addressType==='residential')}]},c);
+function parseAddressValidation(data,request) {
  const resolved=data.output?.resolvedAddresses?.[0],attrs=resolved?.attributes;
  const isTrue=v=>v===true||v==='true';
- if(!resolved||!isTrue(attrs?.Resolved)||!isTrue(attrs?.DPV)||isTrue(attrs?.InterpolatedAddress))
+ if(isTrue(attrs?.POBox)||isTrue(attrs?.POBoxOnlyZIP))throw Error('FedEx requires a street address, not a PO Box');
+ if(isTrue(attrs?.SuiteRequiredButMissing))throw Error('Add the apartment, suite or unit number and calculate shipping again.');
+ if(isTrue(attrs?.InvalidSuiteNumber))throw Error('Check the apartment, suite or unit number and calculate shipping again.');
+ const interpolated=isTrue(attrs?.InterpolatedAddress)||(resolved?.customerMessages||[]).some(x=>x.code==='INTERPOLATED.STREET.ADDRESS');
+ const dpv=isTrue(attrs?.DPV);
+ // FedEx can omit attributes.DPV for an exact standardized postal match.
+ // Its documentation says to inspect the other attributes in that case, rather
+ // than treating an omitted flag as false. Keep explicit DPV failures rejected.
+ const postalMatch=attrs?.DPV==null&&isTrue(attrs?.Matched)&&attrs?.AddressType==='STANDARDIZED'&&
+  isTrue(attrs?.StreetAddress)&&isTrue(attrs?.ZIP11Match)&&/^\d{2}$/.test(resolved?.parsedPostalCode?.deliveryPoint||'');
+ if(!resolved||!isTrue(attrs?.Resolved)||(!dpv&&!postalMatch)||interpolated||isTrue(attrs?.MultipleMatches))
   throw Error('FedEx could not verify the delivery address. Check the street, apartment, city and ZIP.');
  const classification=resolved.classification;
  if(classification==='RESIDENTIAL'&&request.addressType!=='residential')throw Error('FedEx identifies this as a residential address. Select Residential and calculate again.');
  // Do not silently replace the buyer's address with a materially different correction.
- if(String(resolved.postalCode||'').slice(0,5)!==request.address.postal_code.slice(0,5)||resolved.stateOrProvinceCode!==request.address.state)
+ if(String(resolved.postalCode||'').slice(0,5)!==request.address.postal_code.slice(0,5)||resolved.stateOrProvinceCode!==request.address.state||resolved.countryCode!=='US')
   throw Error('FedEx found a different ZIP or state. Please correct the delivery address.');
- return {classification,validated:true};
+ return {classification,validated:true,method:dpv?'dpv':'standardized_postal_match',dpv:dpv?true:null};
+}
+async function validateAddress(request,c) {
+ const data=await post('/address/v1/addresses/resolve',{addressesToValidate:[{address:recipientAddress(request.address,request.addressType==='residential')}]},c);
+ return parseAddressValidation(data,request);
 }
 async function calculate(request) {
  const c=config();
@@ -93,4 +106,4 @@ async function calculate(request) {
  const result=parseRates(await post('/rate/v1/rates/quotes',ratePayload(request,c),c),c.environment);
  return {...result,validation};
 }
-module.exports={config,enabled,accessToken,ratePayload,parseRates,calculate,shipDate,virtual};
+module.exports={config,enabled,accessToken,ratePayload,parseRates,parseAddressValidation,calculate,shipDate,virtual};
