@@ -49,7 +49,8 @@ function ratePayload(request,c=config()) {
   pickupType:request.pickupType,rateRequestType:['ACCOUNT'],packagingType:'YOUR_PACKAGING',preferredCurrency:'USD',
   shipDateStamp:request.shipDate,totalPackageCount:request.packages.length,
   requestedPackageLineItems:request.packages.map((p,i)=>({sequenceNumber:i+1,groupPackageCount:1,
-   weight:{units:'LB',value:p.weightLb},dimensions:{length:p.lengthIn,width:p.widthIn,height:p.heightIn,units:'IN'},
+   weight:p.weightKg!==undefined?{units:'KG',value:p.weightKg}:{units:'LB',value:p.weightLb},
+   dimensions:p.weightKg!==undefined?{length:p.lengthCm,width:p.widthCm,height:p.heightCm,units:'CM'}:{length:p.lengthIn,width:p.widthIn,height:p.heightIn,units:'IN'},
    declaredValue:{amount:p.unitPriceCents/100,currency:'USD'}}))}};
 }
 function parseRates(data,environment) {

@@ -34,18 +34,35 @@ suite('parcel checkout integrity',()=>{
   if(change==='missing')delete d.parcelQuoteId;
   await expect(orders.reserveOrder(d)).rejects.toThrow();expect(await m.Order.count()).toBe(0);expect((await small.reload()).count).toBe(5);
  });
- test('missing package or unavailable carrier cannot become free shipping',async()=>{
-  await small.update({parcelPackage:null});await expect(service.createQuote(1,input())).rejects.toThrow('measurements');
+ test('invalid explicit package or unavailable carrier cannot become free shipping',async()=>{
+  await small.update({parcelPackage:{weightLb:151,lengthIn:10,widthIn:10,heightIn:10}});await expect(service.createQuote(1,input())).rejects.toThrow('measurements');
   await small.update({parcelPackage:{weightLb:10,lengthIn:20,widthIn:10,heightIn:10}});
   require('../../integrations/parcel/fedex').calculate.mockRejectedValueOnce(Error('Carrier unavailable'));
   await expect(service.createQuote(1,input())).rejects.toThrow('Carrier unavailable');expect((await m.ParcelQuote.findOne()).status).toBe('failed');
  });
  test('mixed basket charges both carriers and excludes large parts from parcels',async()=>{
+  await small.update({parcelPackage:null});
   const products=[...input().products,{productId:big.id,count:1}],dest={zip:'34787',addressType:'residential',limitedAccess:false};
   const fq=await require('../../integrations/freight/service').createQuote(1,{...dest,products});const pq=await service.createQuote(1,{...input(),products});
-  expect((await m.ParcelQuote.findByPk(pq.id)).request.packages).toHaveLength(2);
+  const packages=(await m.ParcelQuote.findByPk(pq.id)).request.packages;
+  expect(packages).toHaveLength(2);
+  expect(packages.every(p=>p.productId===small.id&&p.weightKg===7&&p.lengthCm===40&&p.widthCm===30&&p.heightCm===20)).toBe(true);
+  expect(JSON.stringify(pq)).not.toMatch(/weightKg|lengthCm|widthCm|heightCm/);
   const {order}=await orders.reserveOrder({...data(),products,delivey_type:'freight',freightDestination:dest,freightAddress:address,freightQuoteId:fq.id,parcelQuoteId:pq.id});
   expect(order.shippingExpectedCents).toBe(27530);expect(order.freightQuoteId).toBe(fq.id);expect(order.parcelQuoteId).toBe(pq.id);
+ });
+ test('default package quote must be recalculated after an explicit package override',async()=>{
+  await small.update({parcelPackage:null});const q=await service.createQuote(1,input());
+  await small.update({parcelPackage:{weightLb:5,lengthIn:10,widthIn:8,heightIn:6}});
+  await expect(orders.reserveOrder({...data(),parcelQuoteId:q.id})).rejects.toThrow('measurements');
+  expect(await m.Order.count()).toBe(0);expect((await small.reload()).count).toBe(5);
+ });
+ test('freight-only orders still use the broker without calling FedEx',async()=>{
+  const products=[{productId:big.id,count:1}],dest={zip:'34787',addressType:'residential',limitedAccess:false};
+  const fq=await require('../../integrations/freight/service').createQuote(1,{...dest,products});
+  const {order}=await orders.reserveOrder({...data(),products,delivey_type:'freight',freightDestination:dest,freightAddress:address,freightQuoteId:fq.id});
+  expect(order.shippingExpectedCents).toBe(25000);expect(order.parcelQuoteId).toBeNull();
+  expect(require('../../integrations/parcel/fedex').calculate).not.toHaveBeenCalled();
  });
  test('pickup never needs an address, package or carrier quote',async()=>{await small.update({parcelPackage:null});const {order}=await orders.reserveOrder({...data(),delivey_type:'pickup',shippingAddress:null});expect(order.shippingExpectedCents).toBe(0);expect(require('../../integrations/parcel/fedex').calculate).not.toHaveBeenCalled()});
  test('disabled FedEx retains existing shipping but captures site address',async()=>{require('../../integrations/parcel/fedex').enabled.mockReturnValue(false);const {order}=await orders.reserveOrder(data());expect(order.shippingExpectedCents).toBe(0);expect(order.shippingAddress).toEqual(address)});

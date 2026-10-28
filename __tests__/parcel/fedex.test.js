@@ -1,7 +1,7 @@
 jest.mock('axios');
 const axios=require('axios');
 const provider=require('../../integrations/parcel/fedex');
-const {validatePackage}=require('../../integrations/parcel/packages');
+const {validatePackage,productPackage}=require('../../integrations/parcel/packages');
 const reply=(currency='USD',amount=25.53)=>({output:{rateReplyDetails:[{serviceType:'FEDEX_GROUND',serviceName:'FedEx Ground',ratedShipmentDetails:[{rateType:'ACCOUNT',currency,totalNetCharge:amount}]}]}});
 const request={address:{line1:'1 Main St',city:'Winter Garden',state:'FL',postal_code:'34787'},addressType:'residential',origin:{postalCode:'32209'},packages:[{weightLb:10,lengthIn:20,widthIn:12,heightIn:8,unitPriceCents:25000}],shipDate:'2026-10-30',pickupType:'DROPOFF_AT_FEDEX_LOCATION'};
 beforeEach(()=>{process.env.FEDEX_ENVIRONMENT='sandbox';process.env.FEDEX_CHECKOUT_ENABLED='true';process.env.FEDEX_API_KEY='unit-key';process.env.FEDEX_SECRET_KEY='unit-secret';process.env.FEDEX_ACCOUNT_NUMBER='000000000';jest.clearAllMocks()});
@@ -11,6 +11,16 @@ test('package validation rounds dimensions up and rejects missing or oversize da
  for(const value of [null,{}, {weightLb:151,lengthIn:10,widthIn:10,heightIn:10},{weightLb:10,lengthIn:100,widthIn:30,heightIn:30},{weightLb:'junk',lengthIn:10,widthIn:10,heightIn:10}])expect(()=>validatePackage(value)).toThrow();
 });
 test('payload includes real address, each package and declared value',()=>{const body=provider.ratePayload(request);expect(body.accountNumber.value).toBe('000000000');expect(body.requestedShipment.recipient.address.residential).toBe(true);expect(body.requestedShipment.requestedPackageLineItems[0]).toMatchObject({weight:{units:'LB',value:10},declaredValue:{amount:250,currency:'USD'},dimensions:{units:'IN',length:20}})});
+test('ordinary parts use the approved 7 kg and 40 x 30 x 20 cm without inch rounding',()=>{
+ const pack=productPackage({parcelPackage:null});
+ const body=provider.ratePayload({...request,packages:[{...pack,unitPriceCents:5000}]});
+ expect(body.requestedShipment.requestedPackageLineItems[0]).toMatchObject({weight:{units:'KG',value:7},dimensions:{units:'CM',length:40,width:30,height:20},declaredValue:{amount:50,currency:'USD'}});
+ pack.weightKg=99;expect(productPackage({}).weightKg).toBe(7);
+});
+test('explicit package measurements take precedence and invalid overrides cannot become default parcels',()=>{
+ expect(productPackage({parcelPackage:{weightLb:2,lengthIn:8,widthIn:6,heightIn:4}})).toEqual({weightLb:2,lengthIn:8,widthIn:6,heightIn:4});
+ expect(productPackage({parcelPackage:{weightLb:151,lengthIn:8,widthIn:6,heightIn:4}})).toBeNull();
+});
 test('selects cheapest usable account rate, including surcharges, without economy or freight',()=>{
  const data=reply();data.output.rateReplyDetails.push({serviceType:'FEDEX_2_DAY',ratedShipmentDetails:[{rateType:'ACCOUNT',currency:'USD',totalNetCharge:50}]},{serviceType:'FEDEX_GROUND_ECONOMY',ratedShipmentDetails:[{rateType:'ACCOUNT',currency:'USD',totalNetCharge:1}]});
  expect(provider.parseRates(data,'production').selected.amountCents).toBe(2553);

@@ -4,7 +4,7 @@ FedEx rates complement the existing Savtrans freight flow. A mixed basket pays t
 
 ## Activation
 
-Machine-owned `/etc/carisma/integration.env` is loaded after deployment environment variables. Set these only after production credentials and packed measurements are ready:
+Machine-owned `/etc/carisma/integration.env` is loaded after deployment environment variables. Set these after production credentials, the linked account number and a live rate check are ready:
 
 ```
 FEDEX_ENVIRONMENT=production
@@ -23,7 +23,9 @@ Until activation, the preexisting standard shipping price remains unchanged. New
 
 ## Package data
 
-In Products, open **Указать упаковку FedEx**. Enter packed lb and outer inches for one physical unit. Measurements are website-owned `products.parcelPackage`, retained during Checkmate sync. One unit means one package; dimensions round upward. No unverified default weights or inferred item dimensions are used. Parcels above 150 lb / 108 in longest edge / 165 in length plus girth require freight. Standard parcel calculation is only for goods eligible for ordinary shipping; hazardous/restricted parts require a separately supported service, not this package profile.
+The owner-approved default for every ordinary part is **40 × 30 × 20 cm and 7 kg per physical unit**. It is sent to FedEx in CM/KG without conversion or rounding to inches. This is a rating assumption, not a measurement imported from Checkmate. Dimensions and weight are never included in the customer quote response or displayed in checkout. Large parts retain their Savtrans freight profiles and are excluded from FedEx packages; a mixed cart is quoted separately by each provider.
+
+For a per-product override, open **Указать упаковку FedEx** in Products and enter packed lb and outer inches for one physical unit. Measurements are website-owned `products.parcelPackage`, retained during Checkmate sync. Clearing the override restores the default. One unit means one package; explicit dimensions round upward. Invalid explicit measurements block quoting rather than silently falling back. Parcels above 150 lb / 108 in longest edge / 165 in length plus girth require freight. Standard parcel calculation is only for goods eligible for ordinary shipping; hazardous/restricted parts require a separately supported service, not this package profile.
 
 ## Integrity
 

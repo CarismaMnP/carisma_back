@@ -1,4 +1,7 @@
-// Packed measurements are owned by the website, never overwritten by inventory sync.
+// Owner-approved default for one ordinary part. Keep metric units exact in the
+// carrier request; converting to whole inches would inflate these dimensions.
+const DEFAULT_PACKAGE=Object.freeze({weightKg:7,lengthCm:40,widthCm:30,heightCm:20});
+// Explicit packed measurements are owned by the website, never overwritten by inventory sync.
 function validatePackage(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('Enter the packed weight and all three dimensions');
   const out={};
@@ -12,7 +15,11 @@ function validatePackage(input) {
     throw Error('This package exceeds FedEx parcel limits. Use a freight profile instead.');
   return out;
 }
-function productPackage(product) {try{return validatePackage(product.parcelPackage);}catch(_){return null;}}
+function productPackage(product) {
+  if(product?.parcelPackage==null)return {...DEFAULT_PACKAGE};
+  // An invalid explicit override must be corrected, not hidden by the default.
+  try{return validatePackage(product.parcelPackage);}catch(_){return null;}
+}
 async function save(productId,input) {
   if(!Number.isSafeInteger(Number(productId)) || Number(productId)<=0)throw Error('Invalid product');
   const {Product}=require('../../models/models');
@@ -22,4 +29,4 @@ async function save(productId,input) {
   await p.update({parcelPackage});
   return {id:p.id,parcelPackage};
 }
-module.exports={validatePackage,productPackage,save};
+module.exports={DEFAULT_PACKAGE,validatePackage,productPackage,save};
