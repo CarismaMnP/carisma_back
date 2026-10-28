@@ -17,6 +17,7 @@ router.get('/promo-codes',checkRole('ADMINISTRATOR'),handle(()=>promos.list()));
 router.post('/promo-codes',checkRole('ADMINISTRATOR'),handle(req=>promos.save(null,req.body)));
 router.put('/promo-codes/:id',checkRole('ADMINISTRATOR'),handle(req=>promos.save(req.params.id,req.body)));
 const freight=require('../../controllers/freightController');
+router.get('/parcel/quotes',checkRole('ADMINISTRATOR'),handle(req=>require('../../integrations/parcel/service').list(req.query.page)));
 router.get('/freight/quotes',checkRole('ADMINISTRATOR'),freight.list);
 router.get('/freight/profiles',checkRole('ADMINISTRATOR'),freight.profiles);
 

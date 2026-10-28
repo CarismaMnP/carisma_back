@@ -61,8 +61,10 @@ async function loadBasket(input) {
   return {rows:basket(products,items),products,items};
 }
 async function requirements(input) {
-  const {rows}=await loadBasket(input);
-  return {requiresFreight:rows.some(x=>x.profile),subtotalCents:rows.reduce((sum,x)=>sum+x.unitPriceCents*x.count,0),
+  const {rows,products}=await loadBasket(input);
+  return {requiresParcel:require('../parcel/fedex').enabled()&&rows.some(x=>!x.profile),
+    parcelMissingMeasurements:products.filter(p=>!productProfile(p)&&!require('../parcel/packages').productPackage(p)).map(p=>p.id),
+    requiresFreight:rows.some(x=>x.profile),subtotalCents:rows.reduce((sum,x)=>sum+x.unitPriceCents*x.count,0),
     items:rows.map(x=>({productId:x.productId,name:x.name,count:x.count,unitPriceCents:x.unitPriceCents,
       freight:x.profile ? {code:x.profile.code,label:x.profile.label} : null})),originZip:'32209'};
 }

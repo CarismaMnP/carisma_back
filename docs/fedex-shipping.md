@@ -1,0 +1,40 @@
+# Parcel shipping
+
+FedEx rates complement the existing Savtrans freight flow. A mixed basket pays the sum of both quotes. Pickup is free. Nothing here books a shipment or creates a label.
+
+## Activation
+
+Machine-owned `/etc/carisma/integration.env` is loaded after deployment environment variables. Set these only after production credentials and packed measurements are ready:
+
+```
+FEDEX_ENVIRONMENT=production
+FEDEX_CHECKOUT_ENABLED=true
+FEDEX_API_KEY=<production project key>
+FEDEX_SECRET_KEY=<production project secret>
+FEDEX_ACCOUNT_NUMBER=<9-digit linked shipping account>
+FEDEX_PICKUP_TYPE=DROPOFF_AT_FEDEX_LOCATION
+```
+
+The pickup default assumes the warehouse drops packages at FedEx. If the actual operation uses scheduled pickup, configure `USE_SCHEDULED_PICKUP` and validate the applicable account rates. Ship date is the next weekday in America/New_York; checkout displays only carrier transit estimates, not a promised arrival date.
+
+Enable Rates and Transit Times plus Address Validation on the project. Locations Search is not required for home/business delivery. Sandbox credentials authenticate against `https://apis-sandbox.fedex.com`, but virtualized sandbox prices are not valid customer charges. The code refuses to enable customer checkout in sandbox, and refuses a virtual rate response in production.
+
+Until activation, the preexisting standard shipping price remains unchanged. New website checkout still collects and locks the full delivery address before Stripe. Existing unpaid Stripe sessions retain their original amounts and expiry.
+
+## Package data
+
+In Products, open **Указать упаковку FedEx**. Enter packed lb and outer inches for one physical unit. Measurements are website-owned `products.parcelPackage`, retained during Checkmate sync. One unit means one package; dimensions round upward. No unverified default weights or inferred item dimensions are used. Parcels above 150 lb / 108 in longest edge / 165 in length plus girth require freight. Standard parcel calculation is only for goods eligible for ordinary shipping; hazardous/restricted parts require a separately supported service, not this package profile.
+
+## Integrity
+
+Server calculates prices from current inventory, never client amounts. Quotes are owner-scoped, cached for 30 minutes, persisted with full cart/price/package/address fingerprints and selected carrier service. Price, cart, package, account, ship date or address changes invalidate an unused quote. Pending and hourly limits bound provider traffic. No inventory is reserved while quoting.
+
+At order creation, stock and quote are checked in one DB transaction. Small and large charges are added. Stripe receives an order-specific Customer.shipping address and fixed shipping amount; it does not collect a second shipping address. Stripe Tax uses that customer address. Webhook records billing separately, preserves delivery address, and flags shipping amount/customer/quote discrepancies for review before Checkmate processing.
+
+Admin **Грузовая доставка → Посылки · FedEx** shows saved quote details and failures. Requests contain delivery addresses: retain administrator-only access. Credentials, bearer tokens and full Axios errors must not appear in logs or API responses.
+
+## Validation
+
+`npm run test:checkout` runs all inventory, freight and parcel tests. Database integration tests require `CARPARTS_TEST_DB=true` and a dedicated DB whose name begins `carisma_sync_test_`; they reset that database and mock Stripe/Checkmate/providers. Never use production DB credentials for tests.
+
+Official references: https://developer.fedex.com/api/en-us/catalog/rate/v1/docs.html and https://developer.fedex.com/api/en-us/catalog/address-validation/docs.html .

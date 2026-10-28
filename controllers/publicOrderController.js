@@ -7,7 +7,7 @@ class OrderController {
     let reserved, session;
     try {
       const result = await checkout.withCheckoutLock(req.user?.id, async()=>{
-      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress, promoCode } = req.body;
+      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode } = req.body;
       const userId = req.user?.id;
       const existing = await checkout.matchingOrder(userId, products);
       if (existing) return checkout.resume(userId,existing.order.id);
@@ -16,7 +16,7 @@ class OrderController {
       const user = await User.findByPk(userId);
       if (!user) throw Error('User not found. Please authorize');
       reserved = await reserveOrder({ userId, fullName, mail, phone, delivey_type, products,
-        freightQuoteId, freightDestination, freightAddress, promoCode });
+        freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode });
       const { order, items } = reserved;
       const lineItems = items.flatMap(item => require('../integrations/pricing/promos').stripeLines(reserved.products.find(p => p.id === item.productId),item));
       session = await createCheckoutSession({
@@ -24,7 +24,10 @@ class OrderController {
         amount: order.sum,
         customerEmail: mail,
         lineItems,
-        collectShippingAddress: delivey_type === 'ups',
+        collectShippingAddress: delivey_type === 'ups' && !order.shippingAddress,
+        shipping: order.shippingAddress ? {amountCents:order.shippingExpectedCents,address:order.shippingAddress,
+          name:order.fullName,phone:order.phone,freightQuoteId:order.freightQuoteId,parcelQuoteId:order.parcelQuoteId,
+          label:order.parcelQuoteId ? (order.freightQuoteId?'Freight + FedEx delivery':order.parcelSnapshot.result.selected.serviceName) : order.freightQuoteId?'Freight delivery · lift-gate & insurance':'Standard Shipping'} : null,
         freight: order.freightQuoteId ? {quoteId:order.freightQuoteId,amountCents:order.shippingExpectedCents,
           address:order.freightAddress,name:order.fullName,phone:order.phone} : null,
       });

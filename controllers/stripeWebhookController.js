@@ -125,16 +125,20 @@ class StripeWebhookController {
     if (order.freightQuoteId && (full.metadata?.freightQuoteId!==order.freightQuoteId ||
       (order.stripeCustomerId && full.customer!==order.stripeCustomerId)))
       shippingReview='The paid freight reference does not match the checkout order';
+    if (order.parcelQuoteId && (full.metadata?.parcelQuoteId!==order.parcelQuoteId || order.parcelSnapshot?.request?.environment!=='production' || order.parcelSnapshot?.result?.virtual))
+      shippingReview='The paid FedEx reference does not match the checkout order';
+    if (order.shippingAddress && order.stripeCustomerId && full.customer!==order.stripeCustomerId)
+      shippingReview='The payment customer does not match the delivery address';
     const updates = {
       checkoutSessionId: full.id,
       tax: (full.total_details?.amount_tax || 0) / 100,
       total: (full.amount_total || 0) / 100,
       shippingAmount: (full.total_details?.amount_shipping || 0) / 100,
       billingAddress: full.customer_details?.address || null,
-      shippingAddress: order.freightAddress || full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
+      shippingAddress: order.shippingAddress || order.freightAddress || full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
       ...(shippingReview ? {shippingReview} : {}),
     };
-    if (order.delivey_type === 'ups')
+    if (order.delivey_type === 'ups' && !order.shippingAddress)
       Object.assign(updates, this.extractShippingAddressFromCheckoutSession(full) || {});
     const result = await confirmPayment(orderId, {
       paymentIntentId: full.payment_intent,

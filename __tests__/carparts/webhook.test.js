@@ -127,3 +127,10 @@ test('a paid shipping discrepancy is recorded for review while preventing resale
  await controller.confirmSession(session,{livemode:true,created:1000});
  expect(confirmPayment).toHaveBeenCalledWith('order',expect.objectContaining({updates:expect.objectContaining({shippingReview:expect.any(String)})}));
 });
+test.each([null,'quote','customer','environment'])('parcel reconciliation preserves checkout address; mismatch=%s',async mismatch=>{
+ const address={line1:'1 Main St',city:'Winter Garden',state:'FL',postal_code:'34787',country:'US'};
+ Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',delivey_type:'ups',parcelQuoteId:'pq',stripeCustomerId:'cus',shippingExpectedCents:2530,shippingAddress:address,parcelSnapshot:{request:{environment:mismatch==='environment'?'sandbox':'production'},result:{virtual:false}}});
+ stripe.getCheckoutSession.mockResolvedValue({...session,metadata:{orderId:'order',parcelQuoteId:mismatch==='quote'?'other':'pq'},customer:mismatch==='customer'?'other':'cus',amount_total:5030,total_details:{amount_shipping:2530,amount_tax:0},customer_details:{address:{line1:'Different billing address',postal_code:'10001'}}});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ const updates=confirmPayment.mock.calls[0][1].updates;expect(updates.shippingAddress).toEqual(address);expect(updates.address_line_1).toBeUndefined();expect(updates.billingAddress.postal_code).toBe('10001');expect(!!updates.shippingReview).toBe(!!mismatch);
+});

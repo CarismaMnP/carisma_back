@@ -102,7 +102,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
         throw Error(`${p.name} is no longer available in this quantity`);
       if (p.source === 'carparts' && n !== 1) throw Error('This part is a single inventory item');
     }
-    const shipping = await require('../freight/service').checkoutShipping(data, products, items, transaction);
+    const shipping = await require('../parcel/service').checkoutShipping(data, products, items, transaction);
     const pricing = await require('../pricing/promos').calculate(data.promoCode, items.map(x => ({...x, unitPriceCents:Math.round(products.find(p=>p.id===x.productId).price*100)})), transaction);
     const now = new Date();
     const order = await Order.create(

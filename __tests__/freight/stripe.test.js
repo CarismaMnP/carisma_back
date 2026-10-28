@@ -25,3 +25,10 @@ test('freight uses server quote, immutable shipping address, tax code and idempo
  expect(config.adaptive_pricing).toEqual({enabled:false});
  expect(config.metadata.freightQuoteId).toBe('q');expect(config.automatic_tax.enabled).toBe(true);
 });
+test.each([0,2530,27530])('site address removes Stripe delivery fields and charges %i cents',async cents=>{
+ const address={line1:'1 Main St',city:'Winter Garden',state:'FL',postal_code:'34787',country:'US'};
+ await createCheckoutSession({...base,collectShippingAddress:true,shipping:{amountCents:cents,address,name:'Test',phone:'9045550100',label:'Delivery',parcelQuoteId:cents?'parcel-id':null,freightQuoteId:cents===27530?'freight-id':null}});
+ const config=stripe.checkout.sessions.create.mock.calls[0][0];
+ expect(config.shipping_address_collection).toBeUndefined();expect(config.customer_update).toBeUndefined();expect(config.shipping_options[0].shipping_rate_data.fixed_amount.amount).toBe(cents);expect(config.automatic_tax.enabled).toBe(true);
+ expect(stripe.customers.create.mock.calls[0][0].shipping.address).toEqual(address);if(cents)expect(config.metadata.parcelQuoteId).toBe('parcel-id');
+});

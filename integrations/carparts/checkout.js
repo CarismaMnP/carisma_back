@@ -64,7 +64,7 @@ function summary(order,payment) {
     promoCode:p.promoCode||null,discountCents:p.discountCents||0,
     subtotalCents:Math.round(Number(p.sum)*100),shippingCents:Math.round(Number(p.shippingAmount||0)*100),taxCents:Math.round(Number(p.tax||0)*100),
     totalCents:p.stockAppliedAt||p.paidAt?Math.round(Number(p.total||(Number(p.sum)+Number(p.shippingAmount||0)+Number(p.tax||0)))*100):null,
-    deliveryType:p.delivey_type,shippingAddress:p.freightAddress||p.shippingAddress,carrier:p.freightSnapshot?.result?.selected?.carrier||null,
+    deliveryType:p.delivey_type,shippingAddress:p.freightAddress||p.shippingAddress,carrier:[p.freightSnapshot?.result?.selected?.carrier,p.parcelSnapshot?.result?.selected?.serviceName].filter(Boolean).join(' + ')||null,
     canResume,canCancel:reserved(order)&&!!order.checkoutSessionId&&(!payment||payment.state==='open'),paymentState:payment?.state||(canResume?'open':reserved(order)?'pending':'closed'),paymentExpiresAt:expiry,
     items:(p.orderProducts||[]).map(x=>({productId:x.productId,count:x.count,name:x.productSnapshot?.name||x.product?.name||'Part',
       discountCents:x.discountCents||0,unitPriceCents:x.unitPriceCents??Math.round(Number(x.product?.price||0)*100),link:x.product?.link||null,image:x.product?.images?.[0]||null}))};

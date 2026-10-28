@@ -66,7 +66,7 @@ class ProductController {
       const where = {
         isDeleted: false,
         count: {[Op.gt]: 0},
-        ...(make ? { make } : {}),
+        ...(make ? { make: String(make).trim().toUpperCase()==='BAVARIAN MOTOR WORKS (BMW)'?'BMW':make } : {}),
         ...(model ? { ebayModel: model } : {}),
         ...(category ? { ebayCategory: category } : {}),
         ...(name

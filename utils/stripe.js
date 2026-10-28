@@ -46,7 +46,7 @@ function stripeForOrder(orderId, livemode = true) {
  * @param {boolean} params.collectShippingAddress - Whether Stripe Checkout should collect shipping address
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight, authorizedTestId }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight, shipping, authorizedTestId }) {
   try {
     if (authorizedTestId && (authorizedTestId !== orderId || !authorizedStripeTest(orderId)))
       throw Error('Stripe test checkout is not authorized');
@@ -95,27 +95,27 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
     }
 
     let customerId=null;
-    if (freight) {
-      if (!Number.isSafeInteger(freight.amountCents) || freight.amountCents<=0 || !freight.address?.postal_code)
-        throw Error('A valid freight quote and delivery address are required');
-      // Hosted Checkout cannot rerate on address changes. For freight only, collect
-      // the full delivery address on our site, then use an order-specific Customer
-      // shipping address without an editable Stripe shipping-address form.
-      const customer=await client.customers.create({name:freight.name,email:customerEmail,phone:freight.phone,
-        shipping:{name:freight.name,phone:freight.phone,address:freight.address},metadata:{orderId}},
+    const delivery=shipping || (freight ? {...freight,freightQuoteId:freight.quoteId,label:'Freight delivery · lift-gate & insurance'} : null);
+    if (delivery) {
+      if (!Number.isSafeInteger(delivery.amountCents) || delivery.amountCents<0 ||
+          ((delivery.freightQuoteId||delivery.parcelQuoteId)&&delivery.amountCents===0) || !delivery.address?.postal_code)
+        throw Error('A valid shipping quote and delivery address are required');
+      const customer=await client.customers.create({name:delivery.name,email:customerEmail,phone:delivery.phone,
+        shipping:{name:delivery.name,phone:delivery.phone,address:delivery.address},metadata:{orderId}},
         {idempotencyKey:`checkout-customer:${orderId}`});
       customerId=customer.id;
       delete sessionConfig.customer_email;
       delete sessionConfig.shipping_address_collection;
       sessionConfig.customer=customerId;
       sessionConfig.adaptive_pricing={enabled:false};
-      sessionConfig.metadata.freightQuoteId=freight.quoteId;
-      sessionConfig.payment_intent_data.metadata.freightQuoteId=freight.quoteId;
+      for(const key of ['freightQuoteId','parcelQuoteId'])if(delivery[key]){
+        sessionConfig.metadata[key]=delivery[key];sessionConfig.payment_intent_data.metadata[key]=delivery[key];
+      }
       sessionConfig.shipping_options=[{shipping_rate_data:{type:'fixed_amount',
-        fixed_amount:{amount:freight.amountCents,currency:'usd'},display_name:'Freight delivery · lift-gate & insurance',
+        fixed_amount:{amount:delivery.amountCents,currency:'usd'},display_name:delivery.label||'Delivery',
         tax_behavior:'exclusive',tax_code:'txcd_92010001'}}];
-      const a=freight.address;
-      sessionConfig.custom_text={submit:{message:`Freight delivery to ${[a.line1,a.line2,a.city,a.state,a.postal_code].filter(Boolean).join(', ')}. To change the delivery address, return to Carisma before paying.`.slice(0,1200)}};
+      const a=delivery.address;
+      sessionConfig.custom_text={submit:{message:`Delivery to ${[a.line1,a.line2,a.city,a.state,a.postal_code].filter(Boolean).join(', ')}. To change the delivery address, return to Carisma before paying.`.slice(0,1200)}};
     }
     const session = await client.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
 
