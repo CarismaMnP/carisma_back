@@ -122,6 +122,19 @@ test('freight confirmation keeps the fixed shipping address and records paid shi
  expect(confirmPayment).toHaveBeenCalledWith('order',expect.objectContaining({updates:expect.objectContaining({shippingAddress:freightAddress,shippingAmount:229.61})}));
  expect(confirmPayment.mock.calls[0][1].updates.shippingReview).toBeUndefined();
 });
+test.each([null,'customer'])('pickup saves buyer billing details without using the warehouse as a customer address; mismatch=%s',async mismatch=>{
+ const warehouse={line1:'1300 W Beaver St',city:'Jacksonville',state:'FL',postal_code:'32209',country:'US'};
+ const billing={line1:'Buyer home',city:'New York',state:'NY',postal_code:'10001',country:'US'};
+ Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',delivey_type:'pickup',stripeCustomerId:'cus_pickup',shippingExpectedCents:0});
+ stripe.getCheckoutSession.mockResolvedValue({...session,customer:mismatch?'other':'cus_pickup',amount_total:2688,
+   total_details:{amount_shipping:0,amount_tax:188},customer_details:{address:billing},
+   collected_information:{shipping_details:{address:warehouse}},shipping_details:{address:warehouse}});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ const updates=confirmPayment.mock.calls[0][1].updates;
+ expect(updates.billingAddress).toEqual(billing);expect(updates.shippingAddress).toBeNull();
+ expect(updates.address_line_1).toBeUndefined();expect(updates.tax).toBe(1.88);expect(updates.total).toBe(26.88);expect(updates.shippingAmount).toBe(0);
+ expect(!!updates.shippingReview).toBe(!!mismatch);
+});
 test('a paid shipping discrepancy is recorded for review while preventing resale',async()=>{
  Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',shippingExpectedCents:22961});
  await controller.confirmSession(session,{livemode:true,created:1000});

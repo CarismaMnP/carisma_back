@@ -24,6 +24,14 @@ suite('customer checkout continuation',()=>{
  });
  const post=(path,body,auth=token)=>request(app).post('/order'+path).set('Authorization','Bearer '+auth).send(body);
  const create=()=>post('',input());
+ test('pickup passes only buyer contact to Stripe and persists its per-order customer',async()=>{
+  stripe.createCheckoutSession.mockResolvedValueOnce({sessionId:'cs_pickup',url:'https://checkout.stripe.com/c/pay/cs_pickup',customerId:'cus_pickup',expiresAt:new Date(Date.now()+1800000)});
+  const a=await post('',{...input(),shippingAddress:{line1:'Untrusted address',state:'NY',postal_code:'10001'},pickup:{address:{state:'NY'}}});
+  expect(a.status).toBe(200);
+  expect(stripe.createCheckoutSession).toHaveBeenCalledWith(expect.objectContaining({pickup:{name:'Test Buyer',phone:'9045550100'},collectShippingAddress:false,shipping:null,freight:null}));
+  const order=await m.Order.findByPk(a.body.invoiceId);
+  expect(order.stripeCustomerId).toBe('cus_pickup');expect(order.shippingAddress).toBeNull();expect(order.shippingExpectedCents).toBe(0);
+ });
  test('repeat create returns identical Stripe session without a second order or reservation',async()=>{
   const a=await create(),b=await create();expect(a.status).toBe(200);expect(b.status).toBe(200);expect(b.body.paymentUrl).toBe(a.body.paymentUrl);expect(b.body.reused).toBe(true);
   expect(await m.Order.count()).toBe(1);expect((await product.reload()).count).toBe(2);expect(stripe.createCheckoutSession).toHaveBeenCalledTimes(1);

@@ -127,15 +127,16 @@ class StripeWebhookController {
       shippingReview='The paid freight reference does not match the checkout order';
     if (order.parcelQuoteId && (full.metadata?.parcelQuoteId!==order.parcelQuoteId || order.parcelSnapshot?.request?.environment!=='production' || order.parcelSnapshot?.result?.virtual))
       shippingReview='The paid FedEx reference does not match the checkout order';
-    if (order.shippingAddress && order.stripeCustomerId && full.customer!==order.stripeCustomerId)
-      shippingReview='The payment customer does not match the delivery address';
+    if ((order.shippingAddress || order.delivey_type==='pickup') && order.stripeCustomerId && full.customer!==order.stripeCustomerId)
+      shippingReview='The payment customer does not match the checkout order';
     const updates = {
       checkoutSessionId: full.id,
       tax: (full.total_details?.amount_tax || 0) / 100,
       total: (full.amount_total || 0) / 100,
       shippingAmount: (full.total_details?.amount_shipping || 0) / 100,
       billingAddress: full.customer_details?.address || null,
-      shippingAddress: order.shippingAddress || order.freightAddress || full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
+      // Stripe's pickup tax address belongs to our warehouse, not the customer.
+      shippingAddress: order.delivey_type==='pickup' ? null : order.shippingAddress || order.freightAddress || full.collected_information?.shipping_details?.address || full.shipping_details?.address || null,
       ...(shippingReview ? {shippingReview} : {}),
     };
     if (order.delivey_type === 'ups' && !order.shippingAddress)

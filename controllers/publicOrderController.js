@@ -24,6 +24,7 @@ class OrderController {
         amount: order.sum,
         customerEmail: mail,
         lineItems,
+        pickup: order.delivey_type === 'pickup' ? {name:order.fullName,phone:order.phone} : null,
         collectShippingAddress: delivey_type === 'ups' && !order.shippingAddress,
         shipping: order.shippingAddress ? {amountCents:order.shippingExpectedCents,address:order.shippingAddress,
           name:order.fullName,phone:order.phone,freightQuoteId:order.freightQuoteId,parcelQuoteId:order.parcelQuoteId,

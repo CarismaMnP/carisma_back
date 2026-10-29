@@ -9,10 +9,25 @@ test('standard shipped order keeps original zero-cost delivery and editable Stri
  expect(config.shipping_options[0].shipping_rate_data.fixed_amount.amount).toBe(0);
  expect(stripe.customers.create).not.toHaveBeenCalled();
 });
-test('self-pickup has no shipping charge or shipping address form',async()=>{
- await createCheckoutSession({...base,collectShippingAddress:false});
+test('pickup taxes use the fixed warehouse address while billing stays separate',async()=>{
+ await createCheckoutSession({...base,collectShippingAddress:false,pickup:{name:'Test Buyer',phone:'9045550100',address:{state:'NY',postal_code:'10001'}}});
+ expect(stripe.customers.create).toHaveBeenCalledWith({name:'Test Buyer',email:base.customerEmail,phone:'9045550100',
+   shipping:{name:'Test Buyer',phone:'9045550100',address:{line1:'1300 W Beaver St',city:'Jacksonville',state:'FL',postal_code:'32209',country:'US'}},
+   metadata:{orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville'}},
+   {idempotencyKey:'checkout-customer:uuid'});
  const config=stripe.checkout.sessions.create.mock.calls[0][0];
  expect(config.shipping_options).toBeUndefined();expect(config.shipping_address_collection).toBeUndefined();
+ expect(config.customer).toBe('cus_freight');expect(config.customer_email).toBeUndefined();
+ expect(config.billing_address_collection).toBe('required');expect(config.customer_update).toEqual({address:'auto'});
+ expect(config.automatic_tax.enabled).toBe(true);expect(config.adaptive_pricing).toEqual({enabled:false});
+ expect(config.custom_text.submit.message).toContain('Free pickup');
+ expect(config.metadata).toEqual({orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville'});
+ expect(config.payment_intent_data.metadata).toEqual(config.metadata);
+ expect(stripe.checkout.sessions.create.mock.calls[0][1]).toEqual({idempotencyKey:'checkout:uuid'});
+});
+test.each([{shipping:{}},{freight:{}},{collectShippingAddress:true}])('pickup rejects conflicting delivery parameters %j before Stripe calls',async conflict=>{
+ await expect(createCheckoutSession({...base,pickup:{name:'Test'},...conflict})).rejects.toThrow('Pickup cannot be combined');
+ expect(stripe.customers.create).not.toHaveBeenCalled();expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
 });
 test('freight uses server quote, immutable shipping address, tax code and idempotency',async()=>{
  const address={line1:'1 Test St',city:'Winter Garden',state:'FL',postal_code:'34787',country:'US'};
