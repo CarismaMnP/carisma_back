@@ -7,20 +7,26 @@ class OrderController {
     let reserved, session;
     try {
       const result = await checkout.withCheckoutLock(req.user?.id, async()=>{
-      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode } = req.body;
+      const { fullName, mail, phone, delivey_type, products, freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode, resaleRequested, resaleTaxExemptExpected } = req.body;
       const userId = req.user?.id;
       const existing = await checkout.matchingOrder(userId, products);
-      if (existing) return checkout.resume(userId,existing.order.id);
+      if (existing) {
+        if (typeof resaleRequested==='boolean' && resaleRequested!==existing.order.resaleRequested)
+          throw Object.assign(Error('These items have an unpaid order with a different resale selection. Cancel that order before changing its tax settings.'),{status:409});
+        return checkout.resume(userId,existing.order.id);
+      }
       if (!userId || !fullName || !phone || !mail || !Array.isArray(products) || !products.length)
         throw Error('Please fill in the order form');
       const user = await User.findByPk(userId);
       if (!user) throw Error('User not found. Please authorize');
       reserved = await reserveOrder({ userId, fullName, mail, phone, delivey_type, products,
-        freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode });
+        freightQuoteId, freightDestination, freightAddress, shippingAddress, parcelQuoteId, addressType, promoCode, resaleRequested, resaleTaxExemptExpected });
       const { order, items } = reserved;
       const lineItems = items.flatMap(item => require('../integrations/pricing/promos').stripeLines(reserved.products.find(p => p.id === item.productId),item));
       session = await createCheckoutSession({
         orderId: order.id,
+        resaleTaxExempt: order.resaleTaxExempt,
+        resaleApplicationId: order.resaleSnapshot?.applicationId,
         amount: order.sum,
         customerEmail: mail,
         lineItems,

@@ -129,6 +129,12 @@ class StripeWebhookController {
       shippingReview='The paid FedEx reference does not match the checkout order';
     if ((order.shippingAddress || order.delivey_type==='pickup') && order.stripeCustomerId && full.customer!==order.stripeCustomerId)
       shippingReview='The payment customer does not match the checkout order';
+    if (order.resaleTaxExempt && (full.metadata?.resaleTaxExempt!=='true' ||
+        full.metadata?.resaleApplicationId!==order.resaleSnapshot?.applicationId ||
+        full.customer_details?.tax_exempt!=='exempt' || Number(full.total_details?.amount_tax || 0)!==0))
+      shippingReview='The paid tax exemption does not match the approved resale certificate';
+    if (!order.resaleTaxExempt && (full.metadata?.resaleTaxExempt==='true' || full.customer_details?.tax_exempt==='exempt'))
+      shippingReview='Unexpected tax exemption on a taxable order';
     const updates = {
       checkoutSessionId: full.id,
       tax: (full.total_details?.amount_tax || 0) / 100,

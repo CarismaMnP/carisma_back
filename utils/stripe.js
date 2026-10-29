@@ -52,10 +52,14 @@ function stripeForOrder(orderId, livemode = true) {
  * @param {boolean} params.collectShippingAddress - Whether Stripe Checkout should collect shipping address
  * @returns {Promise<Object>} - Checkout session object with url and id
  */
-async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight, shipping, pickup, authorizedTestId }) {
+async function createCheckoutSession({ orderId, amount, customerEmail, lineItems, collectShippingAddress, freight, shipping, pickup, resaleTaxExempt = false, resaleApplicationId, authorizedTestId }) {
   try {
     if (authorizedTestId && (authorizedTestId !== orderId || !authorizedStripeTest(orderId)))
       throw Error('Stripe test checkout is not authorized');
+    if (resaleTaxExempt && (!resaleApplicationId || resaleTaxExempt!==true))
+      throw Error('An approved certificate snapshot is required for tax exemption');
+    const taxStatus=resaleTaxExempt===true?'exempt':'none';
+    const taxMetadata={resaleTaxExempt:String(resaleTaxExempt===true),...(resaleApplicationId?{resaleApplicationId}: {})};
     const client = authorizedTestId ? stripeForOrder(orderId, false) : stripe;
     if (pickup && (shipping || freight || collectShippingAddress))
       throw Error('Pickup cannot be combined with a delivery address or shipping quote');
@@ -69,10 +73,12 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       customer_email: customerEmail,
       metadata: {
         orderId: orderId,
+        ...taxMetadata,
       },
       payment_intent_data: {
         metadata: {
           orderId: orderId,
+          ...taxMetadata,
         },
       },
       // Enable automatic tax calculation
@@ -105,11 +111,11 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
     let customerId=null;
     const delivery=shipping || (freight ? {...freight,freightQuoteId:freight.quoteId,label:'Freight delivery · lift-gate & insurance'} : null);
     if (pickup) {
-      const metadata={orderId,fulfillment:'pickup',pickupLocation:'jacksonville'};
+      const metadata={...taxMetadata,orderId,fulfillment:'pickup',pickupLocation:'jacksonville'};
       // Checkout Tax prioritizes a customer's saved shipping address over billing.
       // Create a customer per order so pickup never changes an existing customer's
       // shipping address. Collect real billing details separately in Checkout.
-      const customer=await client.customers.create({name:pickup.name,email:customerEmail,phone:pickup.phone,
+      const customer=await client.customers.create({name:pickup.name,email:customerEmail,phone:pickup.phone,tax_exempt:taxStatus,
         shipping:{name:pickup.name,phone:pickup.phone,address:{...PICKUP_ADDRESS}},metadata},
         {idempotencyKey:`checkout-customer:${orderId}`});
       customerId=customer.id;
@@ -120,13 +126,13 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
       sessionConfig.adaptive_pricing={enabled:false};
       Object.assign(sessionConfig.metadata,metadata);
       Object.assign(sessionConfig.payment_intent_data.metadata,metadata);
-      sessionConfig.custom_text={submit:{message:'Free pickup at Carisma M & P, 1300 W Beaver St, Jacksonville, FL 32209. Sales tax is calculated for this pickup location.'}};
+      sessionConfig.custom_text={submit:{message:'Free pickup at Carisma M & P, 1300 W Beaver St, Jacksonville, FL 32209. '+(resaleTaxExempt?'Your approved resale exemption applies to this order.':'Sales tax is calculated for this pickup location.')}};
     } else if (delivery) {
       if (!Number.isSafeInteger(delivery.amountCents) || delivery.amountCents<0 ||
           ((delivery.freightQuoteId||delivery.parcelQuoteId)&&delivery.amountCents===0) || !delivery.address?.postal_code)
         throw Error('A valid shipping quote and delivery address are required');
-      const customer=await client.customers.create({name:delivery.name,email:customerEmail,phone:delivery.phone,
-        shipping:{name:delivery.name,phone:delivery.phone,address:delivery.address},metadata:{orderId}},
+      const customer=await client.customers.create({name:delivery.name,email:customerEmail,phone:delivery.phone,tax_exempt:taxStatus,
+        shipping:{name:delivery.name,phone:delivery.phone,address:delivery.address},metadata:{orderId,...taxMetadata}},
         {idempotencyKey:`checkout-customer:${orderId}`});
       customerId=customer.id;
       delete sessionConfig.customer_email;
@@ -141,6 +147,12 @@ async function createCheckoutSession({ orderId, amount, customerEmail, lineItems
         tax_behavior:'exclusive',tax_code:'txcd_92010001'}}];
       const a=delivery.address;
       sessionConfig.custom_text={submit:{message:`Delivery to ${[a.line1,a.line2,a.city,a.state,a.postal_code].filter(Boolean).join(', ')}. To change the delivery address, return to Carisma before paying.`.slice(0,1200)}};
+    }
+    if(resaleTaxExempt&&!customerId){
+      const customer=await client.customers.create({email:customerEmail,tax_exempt:taxStatus,metadata:{orderId,...taxMetadata}},
+        {idempotencyKey:`checkout-customer:${orderId}`});
+      customerId=customer.id;delete sessionConfig.customer_email;sessionConfig.customer=customerId;
+      sessionConfig.customer_update={address:'auto'};
     }
     const session = await client.checkout.sessions.create(sessionConfig, {idempotencyKey: `checkout:${orderId}`});
 

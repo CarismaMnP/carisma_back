@@ -4,6 +4,8 @@ const usersController = require('../../controllers/usersController')
 const authMiddleware = require('../../middleware/authMiddleware')
 const optionalAuthMiddleware = require('../../middleware/optionalAuthMiddleware')
 
+router.use('/resale', require('../resaleRouter')())
+
 router.post('/login', usersController.login)
 router.post('/login/sms', usersController.checkLoginSMSCode)
 router.post('/login/email', usersController.loginEmail)

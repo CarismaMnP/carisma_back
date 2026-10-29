@@ -11,7 +11,9 @@ module.exports = function createServer() {
         origin: '*',
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     }));
-    app.use(fileUpload({}))
+    const generalUpload=fileUpload({});
+    // Resale uploads are authenticated and size-limited by their own router.
+    app.use((req,res,next)=>/^\/api\/public\/user\/resale(?:\/|$)/.test(req.path)?next():generalUpload(req,res,next));
     app.use('/static', express.static(__dirname + '/public'));
     app.use(express.static('files'));
 

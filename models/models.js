@@ -17,6 +17,8 @@ const User = sequelize.define('user', {
   discount: { type: DataTypes.INTEGER, defaultValue: 0, allowNull: true },
   total: { type: DataTypes.INTEGER, defaultValue: 0, allowNull: true },
   smsCode: { type: DataTypes.SMALLINT, allowNull: true },
+  resaleTaxExempt: {type:DataTypes.BOOLEAN,allowNull:false,defaultValue:false},
+  resaleCertificateId: DataTypes.UUID,
 });
 
 const Category = sequelize.define('category', {
@@ -109,6 +111,9 @@ const Product = sequelize.define('product', {
 });
 
 const Order = sequelize.define('order', {
+  resaleRequested: {type:DataTypes.BOOLEAN,allowNull:false,defaultValue:false},
+  resaleTaxExempt: {type:DataTypes.BOOLEAN,allowNull:false,defaultValue:false},
+  resaleSnapshot: DataTypes.JSONB,
   id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   userId: { type: DataTypes.INTEGER, allowNull: false },
   state: { type: DataTypes.STRING, allowNull: false },
@@ -273,7 +278,11 @@ RecipeCategory.hasMany(Recipe);
 const carpartsModels = require('../integrations/carparts/models')(sequelize);
 carpartsModels.CarpartsJob.belongsTo(Order, {foreignKey: 'orderId', constraints: false});
 
+const resaleModels=require('../integrations/resale/models')(sequelize);
+resaleModels.ResaleApplication.belongsTo(User,{foreignKey:'userId'});
+
 module.exports = {
+  ...resaleModels,
   ...carpartsModels,
   ...require('../integrations/pricing/models')(sequelize),
   ...require('../integrations/freight/models')(sequelize),

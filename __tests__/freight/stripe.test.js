@@ -11,9 +11,9 @@ test('standard shipped order keeps original zero-cost delivery and editable Stri
 });
 test('pickup taxes use the fixed warehouse address while billing stays separate',async()=>{
  await createCheckoutSession({...base,collectShippingAddress:false,pickup:{name:'Test Buyer',phone:'9045550100',address:{state:'NY',postal_code:'10001'}}});
- expect(stripe.customers.create).toHaveBeenCalledWith({name:'Test Buyer',email:base.customerEmail,phone:'9045550100',
+ expect(stripe.customers.create).toHaveBeenCalledWith({name:'Test Buyer',email:base.customerEmail,phone:'9045550100',tax_exempt:'none',
    shipping:{name:'Test Buyer',phone:'9045550100',address:{line1:'1300 W Beaver St',city:'Jacksonville',state:'FL',postal_code:'32209',country:'US'}},
-   metadata:{orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville'}},
+   metadata:{orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville',resaleTaxExempt:'false'}},
    {idempotencyKey:'checkout-customer:uuid'});
  const config=stripe.checkout.sessions.create.mock.calls[0][0];
  expect(config.shipping_options).toBeUndefined();expect(config.shipping_address_collection).toBeUndefined();
@@ -21,7 +21,7 @@ test('pickup taxes use the fixed warehouse address while billing stays separate'
  expect(config.billing_address_collection).toBe('required');expect(config.customer_update).toEqual({address:'auto'});
  expect(config.automatic_tax.enabled).toBe(true);expect(config.adaptive_pricing).toEqual({enabled:false});
  expect(config.custom_text.submit.message).toContain('Free pickup');
- expect(config.metadata).toEqual({orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville'});
+ expect(config.metadata).toEqual({orderId:'uuid',fulfillment:'pickup',pickupLocation:'jacksonville',resaleTaxExempt:'false'});
  expect(config.payment_intent_data.metadata).toEqual(config.metadata);
  expect(stripe.checkout.sessions.create.mock.calls[0][1]).toEqual({idempotencyKey:'checkout:uuid'});
 });
@@ -46,4 +46,17 @@ test.each([0,2530,27530])('site address removes Stripe delivery fields and charg
  const config=stripe.checkout.sessions.create.mock.calls[0][0];
  expect(config.shipping_address_collection).toBeUndefined();expect(config.customer_update).toBeUndefined();expect(config.shipping_options[0].shipping_rate_data.fixed_amount.amount).toBe(cents);expect(config.automatic_tax.enabled).toBe(true);
  expect(stripe.customers.create.mock.calls[0][0].shipping.address).toEqual(address);if(cents)expect(config.metadata.parcelQuoteId).toBe('parcel-id');
+});
+
+test.each(['pickup','delivery','legacy'])('approved resale uses a fresh exempt Stripe customer for %s',async kind=>{
+ const address={line1:'1 Main St',city:'Jacksonville',state:'FL',postal_code:'32209',country:'US'};
+ const params=kind==='pickup'?{pickup:{name:'Buyer'}}:kind==='delivery'?{shipping:{amountCents:2500,address,name:'Buyer',parcelQuoteId:'pq'}}:{collectShippingAddress:true};
+ await createCheckoutSession({...base,...params,resaleTaxExempt:true,resaleApplicationId:'cert-id'});
+ expect(stripe.customers.create.mock.calls[0][0].tax_exempt).toBe('exempt');
+ const config=stripe.checkout.sessions.create.mock.calls[0][0];expect(config.customer).toBe('cus_freight');expect(config.automatic_tax.enabled).toBe(true);
+ expect(config.metadata.resaleTaxExempt).toBe('true');expect(config.metadata.resaleApplicationId).toBe('cert-id');
+});
+test('missing approval snapshot cannot create an exempt Stripe session',async()=>{
+ await expect(createCheckoutSession({...base,pickup:{name:'Buyer'},resaleTaxExempt:true})).rejects.toThrow('approved certificate');
+ expect(stripe.customers.create).not.toHaveBeenCalled();expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
 });

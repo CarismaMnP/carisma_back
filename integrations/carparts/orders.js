@@ -104,10 +104,12 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
     }
     const shipping = await require('../parcel/service').checkoutShipping(data, products, items, transaction);
     const pricing = await require('../pricing/promos').calculate(data.promoCode, items.map(x => ({...x, unitPriceCents:Math.round(products.find(p=>p.id===x.productId).price*100)})), transaction);
+    const resale = await require('../resale/service').checkoutSnapshot(data, transaction);
     const now = new Date();
     const order = await Order.create(
       {
         ...shipping,
+        ...resale,
         userId: data.userId,
         fullName: data.fullName,
         mail: data.mail,

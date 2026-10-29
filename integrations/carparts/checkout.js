@@ -60,7 +60,7 @@ async function matchingOrder(userId,products) {
 function summary(order,payment) {
   const p=order.get?order.get({plain:true}):order,expiry=payment?.expiresAt||expiresAt(order);
   const canResume=payment?payment.state==='open':reserved(order)&&!!order.checkoutSessionId&&Date.parse(expiry)>Date.now();
-  return {id:p.id,state:p.state,createdAt:p.createdAt,paidAt:p.paidAt,
+  return {id:p.id,resaleRequested:!!p.resaleRequested,resaleTaxExempt:!!p.resaleTaxExempt,state:p.state,createdAt:p.createdAt,paidAt:p.paidAt,
     promoCode:p.promoCode||null,discountCents:p.discountCents||0,
     subtotalCents:Math.round(Number(p.sum)*100),shippingCents:Math.round(Number(p.shippingAmount||0)*100),taxCents:Math.round(Number(p.tax||0)*100),
     totalCents:p.stockAppliedAt||p.paidAt?Math.round(Number(p.total||(Number(p.sum)+Number(p.shippingAmount||0)+Number(p.tax||0)))*100):null,

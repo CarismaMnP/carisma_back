@@ -147,3 +147,15 @@ test.each([null,'quote','customer','environment'])('parcel reconciliation preser
  await controller.confirmSession(session,{livemode:true,created:1000});
  const updates=confirmPayment.mock.calls[0][1].updates;expect(updates.shippingAddress).toEqual(address);expect(updates.address_line_1).toBeUndefined();expect(updates.billingAddress.postal_code).toBe('10001');expect(!!updates.shippingReview).toBe(!!mismatch);
 });
+
+test.each([null,'tax','certificate','customer-status'])('resale payment reconciles the frozen certificate, mismatch=%s',async mismatch=>{
+ Order.findByPk.mockResolvedValue({id:'order',sum:25,checkoutSessionId:'cs_test',resaleTaxExempt:true,resaleSnapshot:{applicationId:'cert'}});
+ stripe.getCheckoutSession.mockResolvedValue({...session,metadata:{orderId:'order',resaleTaxExempt:'true',resaleApplicationId:mismatch==='certificate'?'other':'cert'},total_details:{amount_tax:mismatch==='tax'?100:0},customer_details:{tax_exempt:mismatch==='customer-status'?'none':'exempt'}});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ expect(!!confirmPayment.mock.calls[0][1].updates.shippingReview).toBe(!!mismatch);
+});
+test('unapproved exemption on a normal paid order is held for review',async()=>{
+ stripe.getCheckoutSession.mockResolvedValue({...session,customer_details:{tax_exempt:'exempt'}});
+ await controller.confirmSession(session,{livemode:true,created:1000});
+ expect(confirmPayment.mock.calls[0][1].updates.shippingReview).toContain('Unexpected tax exemption');
+});
