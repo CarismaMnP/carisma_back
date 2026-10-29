@@ -31,7 +31,7 @@ module.exports=({admin=false}={})=>{
    res.json(await ResaleReview.findAll({where:{applicationId:req.params.id},order:[['createdAt','ASC']]}));
   }));
  }else{
-  r.post('/',upload({limits:{fileSize:MAX_BYTES,files:2,fields:2,parts:5},abortOnLimit:true,
+  r.post('/',upload({limits:{fileSize:MAX_BYTES+1,files:2,fields:2,parts:5},abortOnLimit:true,
    limitHandler:(_req,res)=>res.status(413).json({message:'Upload one PDF or Word document, up to 10 MB.'})}),
    handle(async(req,res)=>{
     if(Object.keys(req.files||{}).length!==1||Array.isArray(req.files?.document)||!req.files?.document||Object.keys(req.body||{}).some(k=>k!=='companyName'))return res.status(400).json({message:'Upload one certificate document.'});

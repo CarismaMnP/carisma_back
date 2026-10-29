@@ -114,5 +114,9 @@ suite('private resale applications and checkout tax snapshots',()=>{
   const multiple=await auth(request(app).post('/api/public/user/resale')).field('companyName','Test').attach('document',pdf,'one.pdf').attach('document',pdf,'two.pdf');
   expect(multiple.status).toBeGreaterThanOrEqual(400);expect(await m.ResaleApplication.count()).toBe(0);
  });
+ test('a certificate exactly at the documented 10 MiB boundary is accepted',async()=>{
+  const data=Buffer.alloc(10*1024*1024,32);pdf.copy(data);Buffer.from('%%EOF').copy(data,data.length-5);
+  expect((await upload(1,'maximum.pdf',data)).status).toBe(201);
+ });
  test('upload rate is bounded per customer',async()=>{for(let i=0;i<5;i++)expect((await upload()).status).toBe(201);expect((await upload()).status).toBe(429)});
 });
