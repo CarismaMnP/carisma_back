@@ -9,7 +9,7 @@
     "test": "jest",
     "carparts:worker": "NODE_ENV=production node integrations/carparts/worker.js",
     "test:carparts": "jest --runInBand __tests__/carparts",
-    "test:checkout": "jest --runInBand __tests__/carparts __tests__/freight __tests__/parcel __tests__/resale"
+    "test:checkout": "jest --runInBand __tests__/carparts __tests__/freight __tests__/parcel __tests__/resale __tests__/users"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +24,7 @@
     "date-fns": "^3.6.0",
     "dotenv": "^16.0.3",
     "easy-yandex-s3": "^2.0.0",
+    "exceljs": "4.4.0",
     "express": "^4.18.2",
     "express-fileupload": "^1.5.1",
     "google-libphonenumber": "^3.2.40",

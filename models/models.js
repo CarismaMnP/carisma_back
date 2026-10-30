@@ -14,6 +14,7 @@ const User = sequelize.define('user', {
   wrongRecoveryCodeAttempts: { type: DataTypes.INTEGER, defaultValue: 0, allowNull: true },
   recoveryCode: { type: DataTypes.STRING, unique: false, allowNull: true, defaultValue: '' },
   category: { type: DataTypes.STRING, unique: false, allowNull: false, defaultValue: 'Basic' },
+  purchasingAs: {type: DataTypes.STRING(20), allowNull: true},
   discount: { type: DataTypes.INTEGER, defaultValue: 0, allowNull: true },
   total: { type: DataTypes.INTEGER, defaultValue: 0, allowNull: true },
   smsCode: { type: DataTypes.SMALLINT, allowNull: true },

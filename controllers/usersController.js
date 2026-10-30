@@ -222,11 +222,14 @@ class UsersController {
 
       const user = await User.findOne({where: {id: req.user.id}})
 
-      await user.update({name, phone, mail})
+      const changes = {name, phone, mail};
+      if (Object.hasOwn(req.body, 'purchasingAs')) changes.purchasingAs = require('../integrations/users/segments').category(req.body.purchasingAs);
+      await user.update(changes)
 
       return res.json({user})
 
     } catch (e) {
+      if (e.status === 400) return res.status(400).json({message:e.message});
       return next(ApiError.badRequest(e.message))
     }
   }
