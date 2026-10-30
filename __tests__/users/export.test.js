@@ -1,3 +1,5 @@
+// Format/validation unit tests must also run without database credentials in CI.
+jest.mock('../../db', () => ({sequelize:{}}));
 const {csvCell,makeExport}=require('../../integrations/users/export');
 const {category,queryParts}=require('../../integrations/users/segments');
 describe('safe customer exports',()=>{
