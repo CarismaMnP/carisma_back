@@ -9,7 +9,7 @@
     "test": "jest",
     "carparts:worker": "NODE_ENV=production node integrations/carparts/worker.js",
     "test:carparts": "jest --runInBand __tests__/carparts",
-    "test:checkout": "jest --runInBand __tests__/carparts __tests__/freight __tests__/parcel __tests__/resale __tests__/users"
+    "test:checkout": "jest --runInBand __tests__/carparts __tests__/freight __tests__/parcel __tests__/resale __tests__/users __tests__/refunds"
   },
   "keywords": [],
   "author": "",

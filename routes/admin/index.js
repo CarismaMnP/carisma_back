@@ -22,6 +22,7 @@ router.get('/freight/quotes',checkRole('ADMINISTRATOR'),freight.list);
 router.get('/freight/profiles',checkRole('ADMINISTRATOR'),freight.profiles);
 
 router.get('/carparts/status', checkRole('ADMINISTRATOR'), async (req,res,next)=>{try{res.json(await require('../../integrations/carparts/status').getStatus());}catch(e){next(e)}});
+router.use('/refunds',require('../refundRouter'));
 router.use('/resale',require('../resaleRouter')({admin:true}));
 router.use('/user', usersRouter);
 router.use('/category', checkRole('ADMINISTRATOR'), categoryRouter);

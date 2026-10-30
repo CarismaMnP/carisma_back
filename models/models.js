@@ -136,6 +136,8 @@ const Order = sequelize.define('order', {
   address_line_2: { type: DataTypes.STRING, allowNull: true },
   delivery_instructions: { type: DataTypes.STRING, allowNull: true },
   stripePaymentIntentId: { type: DataTypes.STRING, allowNull: true },
+  stripeRefundedCents: {type:DataTypes.INTEGER,allowNull:false,defaultValue:0},
+  stripeRefundUpdatedAt: DataTypes.DATE,
   checkoutSessionId: DataTypes.STRING,
   checkoutExpiresAt: DataTypes.DATE,
   stockReservedAt: DataTypes.DATE,
@@ -282,7 +284,13 @@ carpartsModels.CarpartsJob.belongsTo(Order, {foreignKey: 'orderId', constraints:
 const resaleModels=require('../integrations/resale/models')(sequelize);
 resaleModels.ResaleApplication.belongsTo(User,{foreignKey:'userId'});
 
+const refundModels=require('../integrations/refunds/models')(sequelize);
+refundModels.RefundRequest.belongsTo(Order,{foreignKey:'orderId'});
+refundModels.RefundRequest.belongsTo(User,{foreignKey:'userId'});
+Order.hasOne(refundModels.RefundRequest,{foreignKey:'orderId'});
+
 module.exports = {
+  ...refundModels,
   ...resaleModels,
   ...carpartsModels,
   ...require('../integrations/pricing/models')(sequelize),

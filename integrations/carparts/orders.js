@@ -147,7 +147,7 @@ async function reserveOrder(data, { authorizedTestId } = {}) {
 async function releaseReservation(orderId, state = 'expired') {
   return sequelize.transaction(async transaction => {
     const order = await Order.findByPk(orderId, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!order || order.stockAppliedAt || order.stockReleasedAt || !order.stockReservedAt)
+    if (!order || order.state === 'refunded' || order.stockAppliedAt || order.stockReleasedAt || !order.stockReservedAt)
       return false;
     const items = await OrderProduct.findAll({
       where: { orderId },
@@ -182,6 +182,8 @@ async function confirmPayment(
     const testAuthorized = order.isIntegrationTest && authorizedIntegrationTest(order.id);
     if (order.isIntegrationTest && (!testAuthorized || paidLive))
       throw Error('Integration test must be explicitly authorized and cannot claim a live payment');
+    // A late payment event must never reopen a refunded order or create another sale.
+    if (order.state === 'refunded') return {order, applied:false};
     // Multiple Stripe event types and webhook retries must share one atomic stock operation.
     if (order.stockAppliedAt) {
       if (Object.keys(updates).length) await order.update(updates, { transaction });

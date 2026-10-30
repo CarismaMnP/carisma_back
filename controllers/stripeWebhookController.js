@@ -86,7 +86,7 @@ class StripeWebhookController {
             await releaseReservation(object.metadata.orderId, 'payment_failed');
           break;
         case 'charge.refunded':
-          await this.handleChargeRefunded(object);
+          await this.handleChargeRefunded(object, event.created);
           break;
         case 'charge.dispute.created':
           await this.handleChargeDisputeCreated(object);
@@ -214,19 +214,8 @@ class StripeWebhookController {
     }
   }
 
-  async handleChargeRefunded(charge) {
-    console.log('Charge refunded:', charge.id);
-    const paymentIntentId = charge.payment_intent;
-
-    if (!paymentIntentId) {
-      return;
-    }
-
-    const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
-    if (order) {
-      await order.update({ state: 'refunded' });
-      console.log(`Order ${order.id} marked as refunded`);
-    }
+  async handleChargeRefunded(charge, eventCreated) {
+    return require('../integrations/refunds/service').chargeRefunded(charge, eventCreated);
   }
 
   async handleChargeDisputeCreated(dispute) {
@@ -239,7 +228,7 @@ class StripeWebhookController {
 
     const order = await Order.findOne({ where: { stripePaymentIntentId: paymentIntentId } });
     if (order) {
-      await order.update({ state: 'disputed' });
+      await Order.update({state:'disputed'}, {where:{id:order.id,state:{[require('sequelize').Op.ne]:'refunded'}}});
       console.log(`Order ${order.id} marked as disputed`);
     }
   }

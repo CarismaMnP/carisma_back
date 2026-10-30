@@ -1,6 +1,6 @@
 const {Op} = require('sequelize');
 const {sequelize} = require('../../db');
-const {Order, OrderProduct, Product} = require('../../models/models');
+const {Order, OrderProduct, Product, RefundRequest} = require('../../models/models');
 const {stripe} = require('../../utils/stripe');
 const {orderItems, releaseReservation} = require('./orders');
 const unpaidStates = ['pending', 'processing'];
@@ -62,6 +62,8 @@ function summary(order,payment) {
   const canResume=payment?payment.state==='open':reserved(order)&&!!order.checkoutSessionId&&Date.parse(expiry)>Date.now();
   return {id:p.id,resaleRequested:!!p.resaleRequested,resaleTaxExempt:!!p.resaleTaxExempt,state:p.state,createdAt:p.createdAt,paidAt:p.paidAt,
     promoCode:p.promoCode||null,discountCents:p.discountCents||0,
+    refundRequest:require('../refunds/service').customerView(p.refundRequest),canRequestRefund:require('../refunds/service').eligible(p)&&!p.refundRequest,
+    stripeRefundedCents:p.stripeRefundedCents||0,
     subtotalCents:Math.round(Number(p.sum)*100),shippingCents:Math.round(Number(p.shippingAmount||0)*100),taxCents:Math.round(Number(p.tax||0)*100),
     totalCents:p.stockAppliedAt||p.paidAt?Math.round(Number(p.total||(Number(p.sum)+Number(p.shippingAmount||0)+Number(p.tax||0)))*100):null,
     deliveryType:p.delivey_type,shippingAddress:p.freightAddress||p.shippingAddress,carrier:[p.freightSnapshot?.result?.selected?.carrier,p.parcelSnapshot?.result?.selected?.serviceName].filter(Boolean).join(' + ')||null,
@@ -87,7 +89,7 @@ async function cancel(userId,id) {
 async function history(userId,rawPage) {
   const page=Math.max(1,Math.min(10000,parseInt(rawPage,10)||1)),limit=10;
   const {count,rows}=await Order.findAndCountAll({where:{userId,isIntegrationTest:false},distinct:true,
-    include:[{model:OrderProduct,include:[{model:Product,attributes:['name','link','images','price']}]}],
+    include:[{model:RefundRequest},{model:OrderProduct,include:[{model:Product,attributes:['name','link','images','price']}]}],
     order:[['createdAt','DESC'],['id','DESC']],limit,offset:(page-1)*limit});
   return {rows:rows.map(x=>summary(x)),count,page};
 }

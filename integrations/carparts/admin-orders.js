@@ -23,13 +23,17 @@ async function updateAdminOrder(id, { state, sum }) {
         !['confirmed', 'delivery', 'delivered', 'completed'].includes(state)
       )
         throw Error(
-          'Payment and refund status is controlled by Stripe. Stock is never restored by a status edit.',
+          'Payment and refund status is controlled by Stripe and reviewed return requests. Stock is never restored by a status edit.',
         );
     }
   }
-  return order.update({
-    ...(state !== undefined ? { state } : {}),
-    ...(sum !== undefined ? { sum } : {}),
+  // Serialize status edits with refund approval/webhooks; a stale editor cannot reopen a refund.
+  return require('../../db').sequelize.transaction(async transaction => {
+    const current = await Order.findByPk(id, {transaction,lock:transaction.LOCK.UPDATE});
+    if (current.state === 'refunded' && (state !== undefined && state !== 'refunded' || sum !== undefined && Number(sum) !== Number(current.sum)))
+      throw Error('This order has been refunded. Its status and amount cannot be changed.');
+    if (current.state !== order.state) throw Error('Order status changed. Refresh the order before editing.');
+    return current.update({...(state !== undefined ? {state} : {}),...(sum !== undefined ? {sum} : {})}, {transaction});
   });
 }
 module.exports = { updateAdminOrder };
