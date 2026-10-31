@@ -77,8 +77,8 @@ function parseAddressValidation(data,request) {
  const resolved=data.output?.resolvedAddresses?.[0],attrs=resolved?.attributes;
  const isTrue=v=>v===true||v==='true';
  if(isTrue(attrs?.POBox)||isTrue(attrs?.POBoxOnlyZIP))throw Error('FedEx requires a street address, not a PO Box');
- if(isTrue(attrs?.SuiteRequiredButMissing))throw Error('Add the apartment, suite or unit number and calculate shipping again.');
  if(isTrue(attrs?.InvalidSuiteNumber))throw Error('Check the apartment, suite or unit number and calculate shipping again.');
+ const suiteMissing=isTrue(attrs?.SuiteRequiredButMissing);
  const interpolated=isTrue(attrs?.InterpolatedAddress)||(resolved?.customerMessages||[]).some(x=>x.code==='INTERPOLATED.STREET.ADDRESS');
  const dpv=isTrue(attrs?.DPV);
  // FedEx can omit attributes.DPV for an exact standardized postal match.
@@ -86,24 +86,34 @@ function parseAddressValidation(data,request) {
  // than treating an omitted flag as false. Keep explicit DPV failures rejected.
  const postalMatch=attrs?.DPV==null&&isTrue(attrs?.Matched)&&attrs?.AddressType==='STANDARDIZED'&&
   isTrue(attrs?.StreetAddress)&&isTrue(attrs?.ZIP11Match)&&/^\d{2}$/.test(resolved?.parsedPostalCode?.deliveryPoint||'');
- if(!resolved||!isTrue(attrs?.Resolved)||(!dpv&&!postalMatch)||interpolated||isTrue(attrs?.MultipleMatches))
+ // USPS can match the building exactly but not a unit. This is useful for
+ // rating, not proof of unit-level delivery: preserve it as a visible warning.
+ const buildingMatch=suiteMissing&&isTrue(attrs?.MultiUnitBase)&&isTrue(attrs?.Matched)&&
+  attrs?.AddressType==='STANDARDIZED'&&isTrue(attrs?.ZIP4Match);
+ if(!resolved||!isTrue(attrs?.Resolved)||(!dpv&&!postalMatch&&!buildingMatch)||interpolated||isTrue(attrs?.MultipleMatches))
   throw Error('FedEx could not verify the delivery address. Check the street, apartment, city and ZIP.');
- const classification=resolved.classification;
- if(classification==='RESIDENTIAL'&&request.addressType!=='residential')throw Error('FedEx identifies this as a residential address. Select Residential and calculate again.');
+ const classification=['BUSINESS','RESIDENTIAL','MIXED'].includes(resolved.classification)?resolved.classification:'UNKNOWN';
+ const lines=Array.isArray(resolved.streetLinesToken)?resolved.streetLinesToken.filter(x=>typeof x==='string'&&x.trim()).slice(0,3):[];
+ const suggestedAddress=lines.length&&resolved.city&&resolved.stateOrProvinceCode&&/^\d{5}(?:-\d{4})?$/.test(resolved.postalCode||'')&&resolved.countryCode==='US'
+  ?{line1:lines[0].slice(0,200),line2:(request.address.line2||lines.slice(1).join(' ')).slice(0,200),city:String(resolved.city).slice(0,100),state:resolved.stateOrProvinceCode,postal_code:resolved.postalCode.slice(0,5),country:'US'}:null;
  // Do not silently replace the buyer's address with a materially different correction.
  if(String(resolved.postalCode||'').slice(0,5)!==request.address.postal_code.slice(0,5)||resolved.stateOrProvinceCode!==request.address.state||resolved.countryCode!=='US')
-  throw Error('FedEx found a different ZIP or state. Please correct the delivery address.');
- return {classification,validated:true,method:dpv?'dpv':'standardized_postal_match',dpv:dpv?true:null};
+  throw Object.assign(Error('FedEx found a different ZIP or state. Please review the suggested address below.'),{addressSuggestion:suggestedAddress});
+ return {classification,addressType:classification==='BUSINESS'?'business':'residential',
+  classificationMethod:['BUSINESS','RESIDENTIAL'].includes(classification)?'fedex':'residential_fallback',
+  validated:!suiteMissing,method:buildingMatch?'standardized_building_match':dpv?'dpv':'standardized_postal_match',dpv:dpv?true:attrs?.DPV==null?null:false,
+  suggestedAddress,warnings:suiteMissing?[{code:'UNIT_MAY_BE_REQUIRED',message:'FedEx found your building. If your address has an apartment, suite or unit number, add it above and recalculate. If it has no unit number, you can continue with this address.'}]:[]};
 }
 async function validateAddress(request,c) {
- const data=await post('/address/v1/addresses/resolve',{addressesToValidate:[{address:recipientAddress(request.address,request.addressType==='residential')}]},c);
+ // Classification belongs to FedEx; do not bias it with a customer-selected flag.
+ const data=await post('/address/v1/addresses/resolve',{addressesToValidate:[{address:recipientAddress(request.address)}]},c);
  return parseAddressValidation(data,request);
 }
 async function calculate(request) {
  const c=config();
  if(!/^\d{9}$/.test(c.account||''))throw Error('A FedEx shipping account number is required');
  const validation=await validateAddress(request,c);
- const result=parseRates(await post('/rate/v1/rates/quotes',ratePayload(request,c),c),c.environment);
+ const result=parseRates(await post('/rate/v1/rates/quotes',ratePayload({...request,addressType:validation.addressType},c),c),c.environment);
  return {...result,validation};
 }
 module.exports={config,enabled,accessToken,ratePayload,parseRates,parseAddressValidation,calculate,shipDate,virtual};

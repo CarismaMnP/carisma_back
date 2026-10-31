@@ -5,8 +5,8 @@ const freight=require('../freight/service');
 const provider=require('./fedex');
 const {productPackage}=require('./packages');
 const TTL=30*60*1000;
-function buildRequest(rows,products,input) {
- const dest=freight.destination(input);
+function buildRequest(rows,products,input,version=2) {
+ const dest=freight.destination({...input,addressType:version===1?input.addressType:'residential'});
  const address=freight.shippingAddress(input.address,dest.zip);
  if(/\b(?:p\.?\s*o\.?\s*box|post\s+office\s+box)\b/i.test(address.line1))throw Error('FedEx requires a street address, not a PO Box');
  const packages=rows.flatMap(row=>{
@@ -17,14 +17,15 @@ function buildRequest(rows,products,input) {
  });
  if(!packages.length||packages.length>20)throw Error('Online parcel quotes support 1–20 packages. Contact us for larger shipments.');
  const c=provider.config();
- return {version:1,environment:c.environment,accountFingerprint:freight.fingerprint(c.account||''),
+ return {version,environment:c.environment,accountFingerprint:freight.fingerprint(c.account||''),
   origin:{streetLines:['1300 W Beaver St'],city:'Jacksonville',stateOrProvinceCode:'FL',postalCode:'32209',countryCode:'US',residential:false},
-  shipDate:provider.shipDate(),pickupType:c.pickupType,address,addressType:dest.addressType,packages,
+  shipDate:provider.shipDate(),pickupType:c.pickupType,address,addressType:version===1?dest.addressType:'automatic',packages,
   cart:rows.map(({productId,count,unitPriceCents,profile})=>({productId,count,unitPriceCents,code:profile?.code||null}))};
 }
 function publicQuote(q){return {id:q.id,amountCents:q.amountCents,currency:'USD',expiresAt:q.expiresAt,
  carrier:'FedEx',serviceName:q.result.selected.serviceName,serviceType:q.result.selected.serviceType,
- transitTime:q.result.selected.transitTime,deliveryDate:q.result.selected.deliveryDate,packageCount:q.request.packages.length};}
+ transitTime:q.result.selected.transitTime,deliveryDate:q.result.selected.deliveryDate,packageCount:q.request.packages.length,
+ addressSuggestion:q.result.validation?.suggestedAddress||null,addressWarnings:q.result.validation?.warnings||[]};}
 async function createQuote(userId,input) {
  if(!provider.enabled())throw Error('FedEx online rates are not enabled yet');
  const {rows,products}=await freight.loadBasket(input.products);
@@ -51,7 +52,7 @@ async function createQuote(userId,input) {
   if(result.virtual||request.environment!=='production')throw Error('Test FedEx quotes cannot be charged to customers');
   await created.update({status:'quoted',result,amountCents:result.selected.amountCents,expiresAt:new Date(Date.now()+TTL)});
   return publicQuote(created);
- }catch(e){await created.update({status:'failed',error:String(e.message).slice(0,500)});throw e;}
+ }catch(e){await created.update({status:'failed',error:String(e.message).slice(0,500),...(e.addressSuggestion?{result:{addressSuggestion:e.addressSuggestion}}:{})});throw e;}
 }
 async function checkoutShipping(data,products,items,transaction) {
  const base=await freight.checkoutShipping(data,products,items,transaction);
@@ -69,7 +70,9 @@ async function checkoutShipping(data,products,items,transaction) {
   const q=await ParcelQuote.findOne({where:{id:data.parcelQuoteId,userId:data.userId},transaction,lock:transaction.LOCK.UPDATE});
   if(!q||q.status!=='quoted'||Date.parse(q.expiresAt)<=Date.now()||q.environment!=='production'||q.result?.virtual)
    throw Error('The FedEx quote has expired. Please calculate again.');
-  const request=buildRequest(rows,products,{zip:address.postal_code.slice(0,5),addressType:data.addressType,address});
+  // Keep unexpired v1 quotes usable during a rolling frontend deployment.
+  const version=q.request.version===1?1:2;
+  const request=buildRequest(rows,products,{zip:address.postal_code.slice(0,5),addressType:data.addressType??q.request.addressType,address},version);
   if(freight.fingerprint(request)!==q.fingerprint)throw Error('Your cart, package measurements or address changed. Calculate shipping again.');
   if(!Number.isSafeInteger(q.amountCents)||q.amountCents<=0)throw Error('Invalid shipping quote');
   parcel={parcelQuoteId:q.id,parcelSnapshot:{request:q.request,result:q.result,quotedAt:q.createdAt,expiresAt:q.expiresAt},
