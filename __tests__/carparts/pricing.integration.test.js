@@ -122,6 +122,39 @@ suite('Site price overrides and cart promotions', () => {
     expect([p.price, p.priceOverrideCents]).toEqual([30, null]);
     await expect(reserve([{ productId: p.id, count: 1 }])).rejects.toThrow('availability or price');
   });
+  test('description-only edits and clearing sync independently of a website price override', async () => {
+    const source = snapshot();
+    source.items[0].TimeStamp = 'unchanged-source-timestamp';
+    source.items[0].ItemSpecifics = JSON.stringify({
+      itemspecifics: [{ itemspecific: 'eBay Title', values: [{ value: 'Separate listing title' }] }],
+    });
+    await catalog.syncCatalog({ snapshot: source });
+    const p = await m.Product.findOne({ where: { carpartsGuid: guid } });
+    const originalLink = p.link;
+    const originalHash = p.carpartsHash;
+    await pricing.apply(1, (await edit([p.id], 'set', '19.99')).id);
+    const other = await manual('Manual description', 10);
+    await other.update({ description: 'Keep manual content', about: 'Keep manual content' });
+
+    // No price or timestamp change is required to detect a text edit in Checkmate.
+    source.items[0].Description = 'Revised condition\nSmall scratch on the left side.';
+    expect((await catalog.syncCatalog({ snapshot: source })).updated).toBe(1);
+    await p.reload();
+    expect(p.carpartsHash).not.toBe(originalHash);
+    expect([p.description, p.about, p.ebayAdditionalNotes]).toEqual(Array(3).fill(source.items[0].Description));
+    expect([p.price, p.old_price, p.priceOverrideCents, p.carpartsPriceCents]).toEqual([19.99, 19.99, 1999, 2500]);
+    expect(p.link).toBe(originalLink);
+    expect(p.name).toBe('Separate listing title');
+    expect((await catalog.syncCatalog({ snapshot: source })).unchanged).toBe(1);
+
+    source.items[0].Description = '';
+    expect((await catalog.syncCatalog({ snapshot: source })).updated).toBe(1);
+    await p.reload();
+    expect([p.description, p.about, p.ebayAdditionalNotes]).toEqual(['', '', '']);
+    expect([p.price, p.priceOverrideCents]).toEqual([19.99, 1999]);
+    expect((await other.reload()).description).toBe('Keep manual content');
+    expect(other.price).toBe(10);
+  });
   test('filtered selection excludes unchecked rows and is frozen across pages and new imports', async () => {
     const a = await manual('A'),
       b = await manual('B'),
