@@ -31,3 +31,13 @@ test.each([{insured_value:'0'},{delivery_postal:'10001'},{contract_charge_types:
  expect(()=>normalizeResult({...fixture,...changes},request,fixture.rest_uri)).toThrow();
 });
 test.each(['https://attacker.example/x','http://vsa.savtrans.com/api.php/rest/rate_request/abcdef.json','https://vsa.savtrans.com/api.php/rest/rate_dispatch/abcdef.json','https://vsa.savtrans.com/api.php/rest/rate_request/abcdef.json?api_password=secret'])('does not follow unsafe broker references %s',url=>expect(()=>quoteUrl(url)).toThrow());
+
+test.each([['FST',50,40,55,165],['BWN',50,40,40,80],['MUF',50,40,50,100],['UCM',50,40,25,140]])('new freight category %s is an insured pallet, not a parcel',(code,length,width,height,weight)=>{
+ const p=productProfile({source:'carparts',carpartsPartCode:code});
+ expect(p).toMatchObject({code,length,width,height,weight,pallets:1});
+ const body=requestBody({...request,insuredCents:25000,shipmentItems:[p]});
+ expect(body.get('insured_value')).toBe('250.00');expect(body.get('items[0][weight]')).toBe(String(weight));
+});
+test.each(['STM','RST','BGG','FDW','RDW','TCM'])('related small/different part %s is not accidentally routed to new freight',code=>{
+ expect(productProfile({source:'carparts',carpartsPartCode:code,ebayCategory:'Seats',name:'Front Seat'})).toBeNull();
+});

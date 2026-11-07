@@ -11,11 +11,11 @@ test('package validation rounds dimensions up and rejects missing or oversize da
  for(const value of [null,{}, {weightLb:151,lengthIn:10,widthIn:10,heightIn:10},{weightLb:10,lengthIn:100,widthIn:30,heightIn:30},{weightLb:'junk',lengthIn:10,widthIn:10,heightIn:10}])expect(()=>validatePackage(value)).toThrow();
 });
 test('payload includes real address, each package and declared value',()=>{const body=provider.ratePayload(request);expect(body.accountNumber.value).toBe('000000000');expect(body.requestedShipment.recipient.address.residential).toBe(true);expect(body.requestedShipment.requestedPackageLineItems[0]).toMatchObject({weight:{units:'LB',value:10},declaredValue:{amount:250,currency:'USD'},dimensions:{units:'IN',length:20}})});
-test('ordinary parts use the approved 7 kg and 40 x 30 x 20 cm without inch rounding',()=>{
+test('ordinary parts use the approved 5 lb and 14 x 10 x 8 inch package',()=>{
  const pack=productPackage({parcelPackage:null});
  const body=provider.ratePayload({...request,packages:[{...pack,unitPriceCents:5000}]});
- expect(body.requestedShipment.requestedPackageLineItems[0]).toMatchObject({weight:{units:'KG',value:7},dimensions:{units:'CM',length:40,width:30,height:20},declaredValue:{amount:50,currency:'USD'}});
- pack.weightKg=99;expect(productPackage({}).weightKg).toBe(7);
+ expect(body.requestedShipment.requestedPackageLineItems[0]).toMatchObject({weight:{units:'LB',value:5},dimensions:{units:'IN',length:14,width:10,height:8},declaredValue:{amount:50,currency:'USD'}});
+ pack.weightLb=99;expect(productPackage({}).weightLb).toBe(5);
 });
 test('explicit package measurements take precedence and invalid overrides cannot become default parcels',()=>{
  expect(productPackage({parcelPackage:{weightLb:2,lengthIn:8,widthIn:6,heightIn:4}})).toEqual({weightLb:2,lengthIn:8,widthIn:6,heightIn:4});

@@ -1,6 +1,6 @@
 // Packaging supplied by Carisma. Inches / pounds, one packaged pallet per part.
 // Classes and NMFC numbers verified against the account's Savtrans commodity catalog.
-const VERSION = '2026-10-19-v1';
+const VERSION = '2026-11-07-v2';
 const definitions = {
   FDR: ['Front door', 60,40,55,165,'door'], RDR: ['Rear door',60,40,55,165,'door'],
   FBR: ['Front bumper',80,40,30,160,'bumper'], RBR: ['Rear bumper',80,40,30,160,'bumper'],
@@ -10,6 +10,8 @@ const definitions = {
   LID: ['Trunk lid / liftgate',65,40,55,180,'door'], RGL: ['Panoramic roof / glass',75,40,60,200,'auto'],
   RGF: ['Panoramic roof frame',75,40,60,200,'auto'], HDL: ['Headliner',50,40,70,125,'auto'],
   FEN: ['Fender',52,40,40,100,'fender'], DPN: ['Dash panel',65,40,40,125,'dash'],
+  FST: ['Front seat',50,40,55,165,'auto'], BWN: ['Back glass / window',50,40,40,80,'auto'],
+  MUF: ['Muffler',50,40,50,100,'auto'], UCM: ['Crossmember / cradle (front or rear)',50,40,25,140,'auto'],
 };
 const aliases = {TR: 'TRA'};
 const normalizeCode = value => aliases[String(value || '').trim().toUpperCase()] || String(value || '').trim().toUpperCase();

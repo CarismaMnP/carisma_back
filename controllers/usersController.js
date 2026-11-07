@@ -7,7 +7,7 @@ const phoneUtil = require('google-libphonenumber').PhoneNumberUtil.getInstance()
 const { sendVerificationCode, sendClientRequest, sendClientMessage } = require('../utils/mailer');
 
 const generateJwt = (id, name, mail, phone, role) => {
-  return jwt.sign({id, name, mail, phone, role}, process.env.SECRET_KEY, {expiresIn: '72h'})
+  return jwt.sign({id, name, mail, phone, role}, process.env.SECRET_KEY, {expiresIn: role === 'USER' ? '90d' : '72h'})
 }
 const newSMSCode = () => {
   return Math.floor(1000 + Math.random() * 9000)

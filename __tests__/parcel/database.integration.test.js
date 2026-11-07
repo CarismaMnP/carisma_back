@@ -71,10 +71,30 @@ suite('parcel checkout integrity',()=>{
   const fq=await require('../../integrations/freight/service').createQuote(1,{...dest,products});const pq=await service.createQuote(1,{...input(),products});
   const packages=(await m.ParcelQuote.findByPk(pq.id)).request.packages;
   expect(packages).toHaveLength(2);
-  expect(packages.every(p=>p.productId===small.id&&p.weightKg===7&&p.lengthCm===40&&p.widthCm===30&&p.heightCm===20)).toBe(true);
-  expect(JSON.stringify(pq)).not.toMatch(/weightKg|lengthCm|widthCm|heightCm/);
+  expect(packages.every(p=>p.productId===small.id&&p.weightLb===5&&p.lengthIn===14&&p.widthIn===10&&p.heightIn===8)).toBe(true);
+  expect(JSON.stringify(pq)).not.toMatch(/weightLb|lengthIn|widthIn|heightIn/);
   const {order}=await orders.reserveOrder({...data(),products,delivey_type:'freight',freightDestination:dest,freightAddress:address,freightQuoteId:fq.id,parcelQuoteId:pq.id});
   expect(order.shippingExpectedCents).toBe(27530);expect(order.freightQuoteId).toBe(fq.id);expect(order.parcelQuoteId).toBe(pq.id);
+ });
+ test('new freight profiles are insured and excluded from FedEx in a mixed order',async()=>{
+  const freight=require('../../integrations/freight/service');
+  await small.update({parcelPackage:null});
+  const large=await m.Product.bulkCreate(['FST','BWN','MUF','UCM'].map(code=>({name:code,link:code,images:[],price:100,count:1,source:'manual',freightCategoryCode:code})));
+  const products=[...input().products,...large.map(p=>({productId:p.id,count:1}))];
+  const fq=await freight.createQuote(1,{zip:'34787',addressType:'residential',products});
+  const snapshot=await m.FreightQuote.findByPk(fq.id);
+  expect(snapshot.request.shipmentItems).toHaveLength(4);expect(snapshot.request.insuredCents).toBe(40000);
+  expect(snapshot.request.accessorials).toEqual(expect.arrayContaining([4,8]));
+  const pq=await service.createQuote(1,{...input(),products});
+  const parcels=(await m.ParcelQuote.findByPk(pq.id)).request.packages;
+  expect(parcels).toHaveLength(2);expect(parcels.every(p=>p.productId===small.id&&p.weightLb===5)).toBe(true);
+ });
+ test('category packaging changes invalidate a previously quoted parcel',async()=>{
+  await small.update({parcelPackage:null,ebayCategory:'Grille'});const q=await service.createQuote(1,input());
+  expect((await m.ParcelQuote.findByPk(q.id)).request.packages[0]).toMatchObject({lengthIn:30,widthIn:10,heightIn:10,weightLb:15});
+  await small.update({ebayCategory:'Cowl'});
+  await expect(orders.reserveOrder({...data(),parcelQuoteId:q.id})).rejects.toThrow('measurements');
+  expect(await m.Order.count()).toBe(0);
  });
  test('default package quote must be recalculated after an explicit package override',async()=>{
   await small.update({parcelPackage:null});const q=await service.createQuote(1,input());

@@ -8,6 +8,7 @@ const checkout=require('../../integrations/carparts/checkout')
 const handle=fn=>async(req,res)=>{try{res.set('Cache-Control','private, no-store');res.json(await fn(req))}catch(e){res.status(e.status||400).json({message:e.message,...(e.addressSuggestion?{addressSuggestion:e.addressSuggestion}:{})})}}
 const addresses=require('../../integrations/freight/addresses')
 const places=require('../../integrations/parcel/places')
+router.get('/address/saved',auth,handle(req=>require('../../integrations/parcel/savedAddress').savedAddress(req.user.id)))
 router.post('/address/context',auth,handle(async req=>({...await (req.body.quoteId?addresses.context(req.user.id,req.body.quoteId):addresses.lookupZip(req.body.zip)),autocompleteEnabled:places.enabled()})))
 router.post('/address/autocomplete',auth,handle(req=>places.autocomplete(req.user.id,req.body)))
 router.post('/address/details',auth,handle(req=>places.details(req.user.id,req.body)))

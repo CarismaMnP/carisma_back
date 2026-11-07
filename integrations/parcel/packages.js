@@ -1,6 +1,6 @@
-// Owner-approved default for one ordinary part. Keep metric units exact in the
-// carrier request; converting to whole inches would inflate these dimensions.
-const DEFAULT_PACKAGE=Object.freeze({weightKg:7,lengthCm:40,widthCm:30,heightCm:20});
+const {categoryPackage}=require('./profiles');
+// One packed ordinary part. Freight routing is resolved before parcel packaging.
+const DEFAULT_PACKAGE=Object.freeze({weightLb:5,lengthIn:14,widthIn:10,heightIn:8});
 // Explicit packed measurements are owned by the website, never overwritten by inventory sync.
 function validatePackage(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('Enter the packed weight and all three dimensions');
@@ -16,7 +16,7 @@ function validatePackage(input) {
   return out;
 }
 function productPackage(product) {
-  if(product?.parcelPackage==null)return {...DEFAULT_PACKAGE};
+  if(product?.parcelPackage==null)return {...(categoryPackage(product) || DEFAULT_PACKAGE)};
   // An invalid explicit override must be corrected, not hidden by the default.
   try{return validatePackage(product.parcelPackage);}catch(_){return null;}
 }
